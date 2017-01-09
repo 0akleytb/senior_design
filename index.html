@@ -10,6 +10,9 @@
     <!-- Optional theme -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
 
+    <!-- Custom styles to override/modify default bootstrap styles -->
+    <link rel="stylesheet" type="text/css" href="custom.css">
+
     <!-- Latest compiled and minified JavaScript -->
     <!-- <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script> -->
     <style>
@@ -21,7 +24,7 @@
       }
 
       .row {
-        height: 500px;
+        height: 90VH; /* Row and therefore Map takes 90% of view height/
         /*height: 100%!important;*/
       }
        /*Optional: Makes the sample page fill the window. */
@@ -30,6 +33,13 @@
         margin: 0;
         padding: 0;
       }*/
+      .drop {
+	  padding:50px;
+  	border:3px dashed #999;
+  	overflow:auto;
+    margin-bottom: 20px;
+  }
+
     </style>
   </head>
   <body>
@@ -37,8 +47,22 @@
 
       <div class="container">
         <div class="row">
-          <div id = "map" class="col-md-9"></div>
-          <div class="col-md-3">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+          <div id = "map" class="col-md-9">
+
+          </div>
+          <div class="col-md-3">
+            <h1>Google Maps Application</h1>
+            <p>[Instructions go here]: Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incid.Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incid. Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incid</p>
+            <input type="file" id="files" name="files[]" multiple />
+            <div id="drop_zone" class = "drop">Drop KML File Here</div>
+            <div id="drop_zone_2" class = "drop">Drop Data File Here</div>
+            <output id="list"></output>
+
+            <div>
+              <button type="button" class="btn btn-primary half-width">Go!</button>
+              <button type="button" class="btn btn-warning half-width">Clear</button>
+            </div>
+
           </div>
         </div>
       </div>
