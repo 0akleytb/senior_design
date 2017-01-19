@@ -15,32 +15,7 @@
 
     <!-- Latest compiled and minified JavaScript -->
     <!-- <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script> -->
-    <style>
-      /* Always set the map height explicitly to define the size of the div
-       * element that contains the map. */
-      #map {
-        height: 100%; /* 100% of parent hieght (row height)*/
-        /*height: 500px;*/
-      }
 
-      .row {
-        height: 90VH; /* Row and therefore Map takes 90% of view height/
-        /*height: 100%!important;*/
-      }
-       /*Optional: Makes the sample page fill the window. */
-      /*html, body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }*/
-      .drop {
-	  padding:50px;
-  	border:3px dashed #999;
-  	overflow:auto;
-    margin-bottom: 20px;
-  }
-
-    </style>
   </head>
   <body>
     <!-- <div id="map"></div> -->
@@ -56,7 +31,7 @@
             <input type="file" id="files" name="files[]" multiple />
             <div id="drop_zone" class = "drop">Drop KML File Here</div>
             <div id="drop_zone_2" class = "drop">Drop Data File Here</div>
-            <output id="list"></output>
+            <output id="list"><p id="temp_text">Uploaded files will show up here</p>></output>
 
             <div>
               <button type="button" class="btn btn-primary half-width">Go!</button>
@@ -70,14 +45,8 @@
   </body>
 
     <script src = "map.js"></script>
+    <!--<script src = "playground.js"></script>-->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCnPYpLcSaAzLuMVcto2yEed67wgm-7PVM&callback=initMap" async defer></script>
-
-
-<!-- OBJECT LITERAL NAMESPACED VERSION
-    <script src = "map_namespaced.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCnPYpLcSaAzLuMVcto2yEed67wgm-7PVM&callback=myApplication.initMap" async defer></script>
-
--->
 
 </html>
 

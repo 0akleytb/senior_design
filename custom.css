@@ -1,7 +1,40 @@
+/* Always set the map height explicitly to define the size of the div
+ * element that contains the map. */
+#map {
+    height: 100%; /* 100% of parent hieght (row height)*/
+    /*height: 500px;*/
+}
+
+.row {
+    height: 90VH; /* Row and therefore Map takes 90% of view height/
+        /*height: 100%!important;*/
+}
+
+.drop {
+    padding:50px;
+    border:3px dashed #999;
+    overflow:auto;
+    margin-bottom: 20px;
+    display: none;
+}
+
 .btn {
 	border-radius: 0px;
 }
 
 .half-width{
   width: 49%!important;
+}
+
+#temp_text{
+    padding: 0px 50px 50px 50px;
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 2em;
+    text-align: center;
+}
+
+output{
+    padding-top: 50px;
+    height: 300px;
 }
