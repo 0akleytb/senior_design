@@ -1,6 +1,6 @@
 /* Always set the map height explicitly to define the size of the div
  * element that contains the map. */
-#map {
+#map{
     height: 100%; /* 100% of parent hieght (row height)*/
     /*height: 500px;*/
 }
@@ -8,7 +8,9 @@
 .row {
     height: 90VH; /* Row and therefore Map takes 90% of view height/
         /*height: 100%!important;*/
+    /*overflow: hidden;*/
 }
+
 
 .drop {
     padding:50px;
@@ -36,5 +38,5 @@
 
 output{
     padding-top: 50px;
-    height: 300px;
+    height: 250px;
 }

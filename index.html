@@ -25,17 +25,19 @@
           <div id = "map" class="col-md-9">
 
           </div>
-          <div class="col-md-3">
+          <div id = "user-interface" class="col-md-3">
             <h1>Google Maps Application</h1>
-            <p>[Instructions go here]: Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incid.Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incid. Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incid</p>
-            <input type="file" id="files" name="files[]" multiple />
+            <p>[Instructions]: Google maps application for FDP brakes. Upload one data file containing data logged. Data file must be a csv or txt file. Different data points must be seperated by a new line and various data information at each point must be delimited by a comma. After file has been uploaded hit "Go" and data will be overlayed on map. Hover over markers to see data.</p>
+            <div id = "input_field">
+              <input type="file" id="files" name="files[]" multiple />
+            </div>
             <div id="drop_zone" class = "drop">Drop KML File Here</div>
             <div id="drop_zone_2" class = "drop">Drop Data File Here</div>
-            <output id="list"><p id="temp_text">Uploaded files will show up here</p>></output>
+            <output id="list"><p id="temp_text">Uploaded files will show up here</p></output>
 
             <div>
-              <button type="button" class="btn btn-primary half-width">Go!</button>
-              <button type="button" class="btn btn-warning half-width">Clear</button>
+              <button type="button" class="btn btn-primary half-width" id = "go_button">Go!</button>
+              <button type="button" class="btn btn-warning half-width" id = "clear_button">Clear</button>
             </div>
 
           </div>
@@ -44,10 +46,9 @@
 
   </body>
 
-    <script src = "map.js"></script>
-    <!--<script src = "playground.js"></script>-->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCnPYpLcSaAzLuMVcto2yEed67wgm-7PVM&callback=initMap" async defer></script>
 
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCnPYpLcSaAzLuMVcto2yEed67wgm-7PVM"></script>
+    <script src = "map.js"></script>
 </html>
 
 
