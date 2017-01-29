@@ -161,6 +161,14 @@ function addMarkerArray(data_array, map){
     for(var i = 0, len = data_array.length; i < len; i++){
         addMarker(data_array[i], map);
     }
+
+    //Extract lat and lng of first point and convert to numbers (data file is read in as a string.)
+    var lat = Number(data_array[0].lat);
+    var lng = Number(data_array[0].lng);
+
+    //Set map view to the first marker
+    map.setCenter({lat: lat, lng: lng});
+
 }
 
 function clearMarkers(markers, map) {
