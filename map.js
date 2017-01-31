@@ -5,8 +5,7 @@
 //Info Window on lat/lng itself: https://developers.google.com/maps/documentation/javascript/infowindows
 //Consider using info windows on lat/lng + kml overlay
 
-//TO DO: FIX UPDATE SO THAT WHEN MARKERS ARE ADDED THE MAP'S VIEW FOCUS (CENTER) MOVED THERE.
-//TO DO: FILL OUT LOREM IPSUM INSTRUCTIONS. FIX CONTROLS COLOUM SO THAT IT ALSO TAKES 90% OF VIEW HEIGHT.
+//3FIX CONTROLS COLOUM SO THAT IT ALSO TAKES 90% OF VIEW HEIGHT.
 
 var model = {
     display_squeal: false,
@@ -90,11 +89,11 @@ function readFile(){
     reader.readAsText(UploadFileLocation.files[0]);
 }
 
-function clearMap(map) {
+function clearMap() {
   //model.map
   //   init();//Simply create a new map. OR you can remove all the markers off the old map.
     model.data_array = [];
-    clearMarkers(model.markers,model.map);
+    clearMarkers(model.markers);
     document.getElementById("input_field").innerHTML = '<input type="file" id="files" name="files[]" multiple />';
     document.getElementById("list").innerHTML = '<p id="temp_text">Uploaded files will show up here</p>';
 
@@ -137,6 +136,7 @@ function addMarker(data, map) {
     var lng = Number(data.lng);
     var squeal = data.squeal.trim(); //Trim string to remove any special characters like newlines or carriage returns
     var image;
+    var info = ObjToString(data);
 
     if (squeal === "true"){
         image = model.squeal_image;
@@ -148,8 +148,12 @@ function addMarker(data, map) {
     var marker = new google.maps.Marker({
         position: {lat: lat, lng: lng},
         map: map,
-        title: ObjToString(data),
+        title: info,
         icon: image
+    });
+
+    google.maps.event.addListener(marker, 'mouseover', function(event) {
+        document.getElementById("data_location").innerHTML = info;
     });
 
     model.markers.push(marker);
@@ -171,7 +175,7 @@ function addMarkerArray(data_array, map){
 
 }
 
-function clearMarkers(markers, map) {
+function clearMarkers(markers) {
     setMapOnAll(markers, null);
 }
 

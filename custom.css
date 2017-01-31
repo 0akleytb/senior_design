@@ -4,8 +4,11 @@
     height: 100%; /* 100% of parent hieght (row height)*/
     /*height: 500px;*/
 }
-
-.row {
+#data_location{
+    font-size: 28px;
+    /*line-height: 300%;*/
+}
+#map-row {
     height: 90VH; /* Row and therefore Map takes 90% of view height/
         /*height: 100%!important;*/
     /*overflow: hidden;*/
