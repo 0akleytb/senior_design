@@ -5,30 +5,23 @@
  *******/
 
 #include <Adafruit_GPS.h>
-#include <SoftwareSerial.h>
 #include <SPI.h>
 #include <SD.h>
 
-/*****
- * If using software serial, keep this line enabled
- * (you can change the pin numbers to match your wiring):
- *****/
-SoftwareSerial mySerial(3, 2);
 
-/*****
- * If using hardware serial (e.g. Arduino Mega), comment out the 
- * above SoftwareSerial line, and enable this line instead
- * (you can change the Serial number to match your wiring):
- *****/
- //HardwareSerial mySerial = Serial1;
+// Hardware Seialport
+#define GPSSerial Serial1
+#define Dir "Datalogging"
 
-Adafruit_GPS GPS(&mySerial);
+
+// Connect to the GPS on hardware serial
+Adafruit_GPS GPS(&GPSSerial);
 
 /*******
  * Set GPSECHO to 'false' to turn off echoing the GPS data to the Serial console 
  * Set to 'true' if you want to debug and listen to the raw GPS sentences. 
  *******/
-#define GPSECHO  true
+#define GPSECHO  false
 
 /*******
  * this keeps track of whether we're using the interrupt
@@ -39,15 +32,20 @@ Adafruit_GPS GPS(&mySerial);
  void useInterrupt(boolean);
  
 /* Pin number corresponding to Chip Select */
-const int chipSelect = 4;
-
+const int chipSelect = 53;
+String fileName = "datalog0.csv";
+const String dtlog = "datalog";
+const String ext = ".csv";
+int count = 0;
+File dataFile;
 
 void setup() 
 {
-  /* Set Serial Baud Rate to 115200 for GPS reads */
-  Serial.begin(115200);
+  /* Set Serial Baud Rate to 115200 for GPS reads, com[uter & Arduino connection */
+  Serial.begin(9600); 
 
-  while (!Serial) 
+  //wait for established connection between arduino & GPS
+  while (!Serial1) 
   {
     ; // wait for serial port to connect. Needed for native USB port only
   }
@@ -65,15 +63,52 @@ void setup()
 
   Serial.print("Initializing SD card...");
 
-  /* see if the card is present and can be initialized: */
+  /* check if the card is present and can be initialized: */
   if (!SD.begin(chipSelect))
   {
     Serial.println("Card failed, or not present");
-    // don't do anything more:
+   // don't do anything more:
     return;
   }
   Serial.println("card initialized.");
 
+//  // If no Directory, one will be created
+//  if(!SD.exists(Dir))
+//  {
+//    SD.mkdir(Dir);
+//  }
+
+  
+    
+  while (SD.exists(fileName))
+   {
+       fileName = dtlog;
+       count += 1;
+       fileName += count;
+       fileName += ext; 
+   }
+
+
+  dataFile = SD.open(fileName, FILE_WRITE);
+
+  if(dataFile){
+  Serial.println("datalog.csv opened successfully");}
+  else{
+  Serial.println("error opening datalog.csv");}
+ 
+
+  /*if the file is available, write to it: */
+  if (dataFile) 
+  {
+    dataFile.println("This is a test");
+    Serial.print("\n This part was not skipped");
+    
+    dataFile.print("Hour, Minute, Second, milliseconds, Day, Month, year");
+    dataFile.print("Fix, Quality, Latitude, Longitude, Latitude (Degrees),");
+    dataFile.print("Longitude (Degrees), Speed (knots), Angle, Altitude, Satelites \n");
+    dataFile.close();
+
+  }
   /********
    * Set timer0 interrupt to go off every 1 millisecond and read data from GPS
    ********/
@@ -155,7 +190,7 @@ void loop()
   if (GPS.newNMEAreceived())
   {
       if (!GPS.parse(GPS.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
-          return;  // we can fail to parse a sentence in which case we should just wait for another
+         ;// return;  // we can fail to parse a sentence in which case we should just wait for another
   }
 
   // if millis() or timer wraps around, we'll just reset it
@@ -168,24 +203,29 @@ void loop()
    *  so you have to close this one before opening another.
    */
 
-  File dataFile = SD.open("datalog.csv", FILE_WRITE);
-
-  /* if the file is available, write to it: */
-  if (dataFile) 
-  {
-    dataFile.println("This is a test! \n");
-    datFile.print("Hour, Minute, Second, milliseconds, Day, Month, year");
-    dataFile.print("Fix, Quality, Latitude, Longitude, Latitude (Degrees),");
-    dataFile.print("Longitude (Degrees), Speed (knots), Angle, Altitude, Satelites \n");
+    dataFile = SD.open(fileName, FILE_WRITE);
+    dataFile.print(GPS.hour); dataFile.print(",");
+    dataFile.print(GPS.minute);dataFile.print(",");
+    dataFile.print(GPS.seconds, DEC); dataFile.print(",");
+    dataFile.print(GPS.milliseconds);dataFile.print(",");
+    dataFile.print(GPS.day, DEC); dataFile.print(",");
+    dataFile.print(GPS.month, DEC); dataFile.print(",");
+    dataFile.print(GPS.year, DEC);dataFile.print(",");
+    dataFile.print((int)GPS.fix);dataFile.print(",");
+    dataFile.print((int)GPS.fixquality); dataFile.print(",");
+    dataFile.print(GPS.latitude, 4); dataFile.print(",");
+    dataFile.print(GPS.lat);dataFile.print(",");
+    dataFile.print(GPS.longitude, 4);dataFile.print(",");
+    dataFile.print(GPS.lon);dataFile.print(",");
+    dataFile.print(GPS.latitudeDegrees, 4);dataFile.print(",");
+    dataFile.print(", "); dataFile.print(",");
+    dataFile.print(GPS.longitudeDegrees, 4);  dataFile.print(",");   
+    dataFile.print(GPS.speed);dataFile.print(",");
+    dataFile.print(GPS.angle);dataFile.print(",");
+    dataFile.print(GPS.altitude);dataFile.print(",");
+    dataFile.print((int)GPS.satellites);dataFile.print(",");
+    dataFile.print("\n");
     dataFile.close();
-    // print to the serial port too:
-    Serial.println("This is a test");
-  }
-  // if the file isn't open, pop up an error:
-  else 
-  {
-    Serial.println("error opening datalog.csv");
-  }
-  
+    
   
 }
