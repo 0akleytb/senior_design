@@ -1,26 +1,29 @@
 /* Always set the map height explicitly to define the size of the div
  * element that contains the map. */
+
+#app-title{
+    font-size: 26px;
+    padding: 0px;
+    margin: 0px 0px 10px 0px;
+}
 #map{
     height: 100%; /* 100% of parent hieght (row height)*/
     /*height: 500px;*/
 }
+
 #data_location{
     font-size: 28px;
-    /*line-height: 300%;*/
+    /*line-height: 400%;*/
+    font-family: "Helvetica Neue";
+    text-transform: uppercase;
 }
+
 #map-row {
-    height: 90VH; /* Row and therefore Map takes 90% of view height/
+    height: 90VH; /* Row and therefore Map takes 90% of view height*/
         /*height: 100%!important;*/
     /*overflow: hidden;*/
-}
+    /*background-color: aqua;*/
 
-
-.drop {
-    padding:50px;
-    border:3px dashed #999;
-    overflow:auto;
-    margin-bottom: 20px;
-    display: none;
 }
 
 .btn {
@@ -31,15 +34,47 @@
   width: 49%!important;
 }
 
-#temp_text{
-    padding: 0px 50px 50px 50px;
-    font-size: 24px;
-    font-weight: 400;
-    line-height: 2em;
-    text-align: center;
+.quarter-width{
+    width: 24%!important;
 }
 
-output{
-    padding-top: 50px;
-    height: 250px;
+/*#temp_text {*/
+    /*font-size: 12px;*/
+    /*font-style: italic;*/
+/*}*/
+
+#data-selection-title{
+    font-size: 16px;
+    font-weight: 500;
+}
+
+#color-previewer{
+    margin-top: 10px!important;
+    /*width: 110%;*/
+}
+
+#color-bar{
+    background: linear-gradient(to right, #fff , #000);
+    height: 20px;
+}
+
+form input{
+    width: 20%;
+}
+
+.bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    /*margin-right: 0px;*/
+    width: 100%;
+    padding: 0 10px;
+    /*margin: 0px!important;*/
+}
+
+.row-eq-height {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: -ms-flexbox;
+    display: flex;
 }

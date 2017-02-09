@@ -1,55 +1,102 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Simple Map</title>
-    <meta name="viewport" content="initial-scale=1.0">
-    <meta charset="utf-8">
-    <!-- Latest compiled and minified CSS -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <head>
+        <title>Simple Map</title>
+        <meta name="viewport" content="initial-scale=1.0">
+        <meta charset="utf-8">
+        <!-- Latest compiled and minified CSS -->
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
-    <!-- Optional theme -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+        <!-- Optional theme -->
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
 
-    <!-- Custom styles to override/modify default bootstrap styles -->
-    <link rel="stylesheet" type="text/css" href="custom.css">
+        <!-- Custom styles to override/modify default bootstrap styles -->
+        <link rel="stylesheet" type="text/css" href="custom.css">
 
-    <!-- Latest compiled and minified JavaScript -->
-    <!-- <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script> -->
+        <!-- Latest compiled and minified JavaScript -->
+        <!-- <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script> -->
 
-  </head>
-  <body>
-    <!-- <div id="map"></div> -->
+    </head>
+<body>
 
-      <div class="container">
-        <div class = "row" id = "data_location" > Data Will Be Shown Here </div>
-        <div class= "row" id = "map-row">
-          <div id = "map" class="col-md-9">
 
-          </div>
-          <div id = "user-interface" class="col-md-3">
-            <h1>Google Maps Application</h1>
+<div class="container">
+
+    <div class = "row" id = "data_location" > Data Shown Here On Hover </div>
+
+    <!--MAP AND UI ROW-->
+    <div class= "row row-eq-height" id = "map-row">
+        <!--MAP COLUMN-->
+        <div id = "map" class="col-md-9"></div>
+        <!--END MAP COLUMN-->
+
+        <!--UI COlUMN-->
+        <div id = "user-interface" class="col-md-3">
+            <h1 id = "app-title">Maps Application</h1>
             <p>[Instructions]: Google maps application for FDP brakes. Upload one data file containing data logged. Data file must be a csv or txt file. Different data points must be seperated by a new line and various data information at each point must be delimited by a comma. After file has been uploaded hit "Go" and data will be overlayed on map. Hover over markers to see data.</p>
             <div id = "input_field">
-              <input type="file" id="files" name="files[]" multiple />
-            </div>
-            <div id="drop_zone" class = "drop">Drop KML File Here</div>
-            <div id="drop_zone_2" class = "drop">Drop Data File Here</div>
-            <output id="list"><p id="temp_text">Uploaded files will show up here</p></output>
-
-            <div>
-              <button type="button" class="btn btn-primary half-width" id = "go_button">Go!</button>
-              <button type="button" class="btn btn-warning half-width" id = "clear_button">Clear</button>
+                <input type="file" id="files" name="files[]" single />
             </div>
 
-          </div>
+            <br>
+            <!--<output id="list"><p id="temp_text">[Uploaded files will show up here]</p></output>-->
+
+            <!--DATA SELECTION-->
+            <div id = "data-selection">
+                <p id = "data-selection-title">Choose Data to Display: </p>
+
+                <select class="form-control" id="sel1">
+                    <option>1</option>
+                    <option>2</option>
+                    <option>3</option>
+                    <option>4</option>
+                </select>
+
+                <div class = "row">
+                    <div class = "col-md-6">
+                        <p style="text-align: center; font-weight: 600; padding-top: 10px;">Min</p>
+                        <span>Limit: </span><input id="min_limit" type="text" class = "half-width">
+                        <span>Color </span><input id="min_color" type="text" class = "half-width">
+                    </div>
+
+                    <div class = "col-md-6">
+                        <p style="text-align: center; font-weight: 600; padding-top: 10px;">Max</p>
+                        <span>Limit: </span><input id="max_limit" type="text" class = "half-width">
+                        <span>Color </span><input id="max_color" type="text" class = "half-width">
+                    </div>
+                </div>
+            </div>
+            <!--END DATA SELECTION-->
+            <br>
+            <!--COLOR BAR-->
+            <div class="row" id="color-previewer">
+                <div class = "col-md-3">Gradient:</div>
+                <div class = "col-md-9" id="color-bar">
+                    <!--<p style="text-align: left;">234</p>-->
+                    <!--<p style="text-align: right;">759</p>-->
+                </div>
+
+            </div>
+
+            <!--<span>Gradient:</span><div id = "color-bar" style="margin-top: 10px;"></div>-->
+            <!--END COLOR BAR-->
+
+            <div class = "bottom">
+                <button type="button" class="btn btn-primary half-width" id = "go_button">Go!</button>
+                <button type="button" class="btn btn-warning half-width" id = "clear_button">Clear</button>
+            </div>
+
         </div>
-      </div>
+        <!--END UI COLUMN-->
+    </div>
+    <!--END MAP AND UI ROW-->
+</div>
 
-  </body>
+</body>
 
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCnPYpLcSaAzLuMVcto2yEed67wgm-7PVM"></script>
+<script src = "map.js"></script>
 
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCnPYpLcSaAzLuMVcto2yEed67wgm-7PVM"></script>
-    <script src = "map.js"></script>
 </html>
 
 
