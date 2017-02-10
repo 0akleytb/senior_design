@@ -20,6 +20,8 @@ var model = {
     no_squeal_color: 'green',
     data_order: ["lat","lng","pressure","temperature","squeal"],
     data_array: [],
+    min_limit: null,
+    max_limit: null,
     min_color: "#fff",
     max_color: "#000",
     gradient_direction: "to right"
@@ -36,6 +38,8 @@ function init(){ //Create function
     document.getElementById("clear_button").addEventListener("click", clearMap)
     document.getElementById("min_color").addEventListener("change", setMinColor)
     document.getElementById("max_color").addEventListener("change", setMaxColor)
+    document.getElementById("min_limit").addEventListener("change", setMinLimit)
+    document.getElementById("max_limit").addEventListener("change", setMaxLimit)
     // document.getElementById('files').addEventListener('change', showFiles, false);
     // document.getElementById("squeal_button").addEventListener("click", updateMap) //Squeal switch. Instead maybe have the layers that they wanted.
     // document.getElementById("files").addEventListener("change", readFile)       //listener for fileuploadlocation. Changing file would
@@ -157,16 +161,40 @@ function addMarker(data, map) {
     // var location = data.location;
     var lat = Number(data.lat);
     var lng = Number(data.lng);
+    var temperature = Number(data.temperature);
     var squeal = data.squeal.trim(); //Trim string to remove any special characters like newlines or carriage returns
     var color;
+    var temp_percent;
+    var percent;
+    var difference;
     var info = ObjToString(data);
 
-    if (squeal === "true"){
-        color = model.squeal_color;
-    }
-    else{
-        color = model.no_squeal_color;
-    }
+    var min_limit = model.min_limit;
+    var min_color = model.min_color;
+    var max_limit = model.max_limit;
+    var max_color = model.max_color;
+
+    //Not doing squeal color anymore. Now only heatmap colors. Squeals are flags.
+    // if (squeal === "true"){
+    //     color = model.squeal_color;
+    // }
+    // else{
+    //     color = model.no_squeal_color;
+    // }
+
+
+    //Static data gradient display
+    difference = Math.max(temperature - min_limit, 0); //Choose max of the two to make sure not negative
+    temp_percent = difference*1.0/(max_limit - min_limit); //Float division since 1.0 //Temp_percent could be greater than 1
+    percent = Math.min(temp_percent, 1);
+
+    color = getGradientColor(min_color, max_color, percent);
+
+    /**Future implementation of updating color based on min max colors
+     *
+     *     difference = Math.max(data[model.selected_data] - model.min_limit, 0); //Make sure float
+     *     percent = difference/(model.max_limit-model.min_limit); //Make sure float division
+     */
 
     //USING CIRCLES
     var circle = new google.maps.Circle({
@@ -181,7 +209,7 @@ function addMarker(data, map) {
         // radius: Math.sqrt(citymap[city].population) * 100
     });
 
-    circle.info = info;
+    circle.info = info; //Could use the info property later.
 
     google.maps.event.addListener(circle, 'mouseover', function(event) {
         document.getElementById("data_location").innerHTML = info;
@@ -266,9 +294,71 @@ function setMaxColor(e){
     model.max_color = e.target.value;
     var gradient = document.getElementById("color-bar");
     gradient.style.background = 'linear-gradient('+ model.gradient_direction + ', ' + model.min_color + ', ' + model.max_color+ ')';
-
-
 }
+
+function setMinLimit(e){
+    model.min_limit = e.target.value;
+    console.log(model.min_limit);
+}
+
+function setMaxLimit(e){
+    model.max_limit = e.target.value;
+    console.log(model.max_limit);
+}
+
+/**
+ * Description: Returns an interpolation of a linear gradient as a hex value
+ * http://stackoverflow.com/questions/3080421/javascript-color-gradient?noredirect=1&lq=1
+ * @param start_color in hex
+ * @param end_color in hex
+ * @param percent. Number between zero and 1
+ * @returns {string}
+ */
+function getGradientColor(start_color, end_color, percent) {
+    // strip the leading # if it's there
+    start_color = start_color.replace(/^\s*#|\s*$/g, '');
+    end_color = end_color.replace(/^\s*#|\s*$/g, '');
+
+    // convert 3 char codes --> 6, e.g. `E0F` --> `EE00FF`
+    if(start_color.length == 3){
+        start_color = start_color.replace(/(.)/g, '$1$1');
+    }
+
+    if(end_color.length == 3){
+        end_color = end_color.replace(/(.)/g, '$1$1');
+    }
+
+    // get colors
+    var start_red = parseInt(start_color.substr(0, 2), 16),
+        start_green = parseInt(start_color.substr(2, 2), 16),
+        start_blue = parseInt(start_color.substr(4, 2), 16);
+
+    var end_red = parseInt(end_color.substr(0, 2), 16),
+        end_green = parseInt(end_color.substr(2, 2), 16),
+        end_blue = parseInt(end_color.substr(4, 2), 16);
+
+    // calculate new color
+    var diff_red = end_red - start_red;
+    var diff_green = end_green - start_green;
+    var diff_blue = end_blue - start_blue;
+
+    diff_red = ( (diff_red * percent) + start_red ).toString(16).split('.')[0];
+    diff_green = ( (diff_green * percent) + start_green ).toString(16).split('.')[0];
+    diff_blue = ( (diff_blue * percent) + start_blue ).toString(16).split('.')[0];
+
+    // ensure 2 digits by color
+    if( diff_red.length == 1 )
+        diff_red = '0' + diff_red
+
+    if( diff_green.length == 1 )
+        diff_green = '0' + diff_green
+
+    if( diff_blue.length == 1 )
+        diff_blue = '0' + diff_blue
+
+    return '#' + diff_red + diff_green + diff_blue;
+}
+
 function populateDropdown(){
 
 }
