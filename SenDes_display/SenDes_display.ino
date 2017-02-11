@@ -29,6 +29,7 @@
 #define PENRADIUS 3
 #define DATAWIDE HEADTEXT*6 // width of a single character of header text
 #define DATAHIGH HEADTEXT*8 // height of a single character of header text
+#define FRAMESIZE 5        // width of the frame around the Squeal button
 
 #define BLACK   0x0000
 #define BLUE    0x001F
@@ -39,6 +40,8 @@
 #define YELLOW  0xFFE0
 #define WHITE   0xFFFF
 #define GRAY    0x7BEF
+#define LITEGRAY 0xC618
+#define DARKGRAY 0x39E7
 
 #define BACKCOLOR WHITE
 #define TESTCOLOR BLUE
@@ -46,16 +49,41 @@
 #define MINPRESSURE 10
 #define MAXPRESSURE 1000
 
+#define BUFFMAX 4
+
+class tsbutton {
+  private:
+    bool* buffpoint;
+    bool buttbuff[BUFFMAX];
+    bool ispressed;
+    bool waspressed;
+
+  public:
+    tsbutton();
+    ~tsbutton();
+    bool buttonPress(bool);
+    bool isPressed();
+    bool wasJustPressed();
+    bool wasJustReleased();
+};
+
+
+
+// GLOBALS //
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, 258);
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 int dummyval = 1234;
 bool logging = false, isSqueal = false, wasSqueal = false;
+tsbutton startButton, squealButton;
 
+
+// **** **** **** **** //
+//                     //
+//     MAIN PROGRAM    //
+//                     //
+// **** **** **** **** //
 
 void setup() {
-  //  Serial.begin(9600);
-  //  Serial.println(F("Paint!"));
-
   tft.reset();
   uint16_t identifier = tft.readID();
 
@@ -89,7 +117,8 @@ void setup() {
   tft.fillScreen(BACKCOLOR);
   tft.setRotation(1);
   writeHeaderText();
-  drawButton();
+  drawFrame();
+  drawButtons();
   Serial.begin(9600);
 }
 
@@ -97,48 +126,70 @@ void loop() {
   TSPoint p = ts.getPoint();
   int coord;
 
-  isSqueal = false;
-  
   if (MINPRESSURE < p.z && p.z < MAXPRESSURE) {
     coord = map(p.y, TS_MAXY, TS_MINY, 0, TFTWIDTH);
     p.y = map(p.x, TS_MINX, TS_MAXX, 0, TFTHEIGHT);
     p.x = coord;
     
-//    Serial.print("\nx = "); Serial.print(p.x);
-//    Serial.print("\ny = "); Serial.print(p.y);
-//    Serial.print("\nz = "); Serial.println(p.z);
-
-    if ((p.x > (TFTWIDTH - BOXWIDE)) && (p.y < BOXHIGH)) { // **** start/stop button pressed ****
-      logging = !logging;
-      drawButton();
-      delay(250); // **** debounce start/stop button ****
-    } else if (logging) { // **** anywhere else pressed, while data-logging ****
-      isSqueal = true;
-    } else { // **** anywhere else pressed, while NOT data-logging ****
-      updateDisplay();
+    if (p.x > (TFTWIDTH - BOXWIDE)) { // **** button pressed ****
+      if (p.y < BOXHIGH) { // **** start/stop button ****
+        if (startButton.buttonPress(true) && startButton.wasJustPressed()) {
+          logging = !logging;
+          drawButtons();
+          delay(250); // **** debounce start/stop button ****
+        }
+        squealButton.buttonPress(false);
+      } else if ((p.y >= BOXHIGH) && logging) { // **** squeal button pressed, while data-logging ****
+        startButton.buttonPress(false);
+        squealButton.buttonPress(true);
+      } else { // **** squeal button pressed, while NOT data-logging ****
+        startButton.buttonPress(false);
+        squealButton.buttonPress(false);
+        updateDisplay();
+      }
+    } else { // **** NO BUTTON PRESSED ****
+      startButton.buttonPress(false);
+      squealButton.buttonPress(false);
     }
-    
+  } else {
+    startButton.buttonPress(false);
+    squealButton.buttonPress(false);
   }
-
+  
+  /*
+  isSqueal = squealButton.isPressed();
   // **** Draw a square in the bottom right of the display to indicate squeal has started ****
   // **** >> erase when squeal has ended, and ignore otherwise ****
-  if (isSqueal && !wasSqueal)
+  if (isSqueal && !wasSqueal) {
     tft.fillRect(TFTWIDTH - BOXSIZE, TFTHEIGHT - BOXSIZE, TFTWIDTH, TFTHEIGHT, TESTCOLOR);
-  else if (wasSqueal &&! isSqueal)
+  } else if (wasSqueal && ! isSqueal) {
     tft.fillRect(TFTWIDTH - BOXSIZE, TFTHEIGHT - BOXSIZE, TFTWIDTH, TFTHEIGHT, BACKCOLOR);
+  }
   wasSqueal = isSqueal;
+  */
+  
+  if (squealButton.wasJustPressed()) {
+    drawSquealButton();
+    isSqueal = true;
+  } else if (squealButton.wasJustReleased()) {
+    drawSquealButton();
+    isSqueal = false;
+  }
+  
 
-
-
-  //write-to-buffer
-    //if full buffer, write to card
-
-  //revert isSqueal to false
 }
 
+
+
+// **** **** **** **** //
+//                     //
+//   UNCLASSED  FXNS   //
+//                     //
+// **** **** **** **** //
+
 // **** Fxn responsible for (re)drawing Start/Stop button ****
-void drawButton() {
-  tft.setTextSize(4);  
+void drawButtons() {
+  tft.setTextSize(4);
   tft.setCursor(TFTWIDTH - BOXWIDE + 20, 40);
   if (logging) {
     tft.fillRect(TFTWIDTH - BOXWIDE, 0, BOXWIDE, BOXHIGH, RED);
@@ -149,76 +200,159 @@ void drawButton() {
     tft.setTextColor(BLACK);
     tft.print("Start");
   }
+  drawSquealButton();
+}
+
+// **** Fxn responsible for drawing frame around Squeal/Squealing button ****
+void drawFrame() {
+  tft.fillRect(TFTWIDTH - BOXWIDE, BOXHIGH - 1, BOXWIDE, TFTHEIGHT + 1, DARKGRAY);
+}
+
+// **** Fxn responsible for (re)drawing Squeal/Squealing button ****
+void drawSquealButton() {
+  int squealboxcolor;
+  int squealtextcolor;
+  tft.setTextSize(3);
+  tft.setCursor(TFTWIDTH - BOXWIDE + 25, 200);
+  tft.setTextColor(DARKGRAY);
+  if (logging) {
+    if (squealButton.isPressed()) {
+      squealboxcolor = GRAY;
+    } else {
+      squealboxcolor = LITEGRAY;
+    }
+  } else {
+    squealboxcolor = DARKGRAY;
+  }
+  tft.fillRect(TFTWIDTH - BOXWIDE + FRAMESIZE, BOXHIGH + FRAMESIZE, BOXWIDE - (2*FRAMESIZE), TFTHEIGHT - BOXHIGH - (2*FRAMESIZE), squealboxcolor);
+  tft.print("Squeal");
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Pressure value ****
 void updatePressureDisplay() {
-  tft.setCursor(10+(DATAWIDE*9), 8+(DATAHIGH*0));
-  tft.fillRect(10+(DATAWIDE*9), 8+(DATAHIGH*0), 8*DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 0));
+  tft.fillRect(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 0), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
   tft.print(dummyval, DEC); dummyval++;
 }
 
 // **** Fxn responsible for updating display with most recent/relevant GPS data ****
 void updateGPSDisplay() {
-  tft.setCursor(10+(DATAWIDE*9), 8+(DATAHIGH*2));
-  tft.fillRect(10+(DATAWIDE*9), 8+(DATAHIGH*2), 8*DATAWIDE, 2*DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 2));
+  tft.fillRect(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 2), 8 * DATAWIDE, 2 * DATAHIGH, BACKCOLOR);
   tft.print(dummyval, DEC); dummyval++;
-  tft.setCursor(10+(DATAWIDE*9), 8+(DATAHIGH*3));
+  tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 3));
   tft.print(dummyval, DEC); dummyval++;
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Temperature values ****
 void updateThermoDisplay() {
-  tft.fillRect(10+(DATAWIDE*3), 8+(DATAHIGH*8), 8*DATAWIDE, 2*DATAHIGH, BACKCOLOR);
-  tft.fillRect((TFTWIDTH/2)+10+(DATAWIDE*3), 8+(DATAHIGH*8), 8*DATAWIDE, 2*DATAHIGH, BACKCOLOR);
-  tft.setCursor(10+(DATAWIDE*3), 8+(DATAHIGH*8));
+  tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 8), 8 * DATAWIDE, 2 * DATAHIGH, BACKCOLOR);
+  tft.fillRect((TFTWIDTH / 2) + 10 - 80 + (DATAWIDE * 3), 8 + (DATAHIGH * 8), 8 * DATAWIDE, 2 * DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 8));
   tft.print(dummyval, DEC); dummyval++;
-  tft.setCursor(10+(DATAWIDE*3), 8+(DATAHIGH*9));
+  tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 9));
   tft.print(dummyval, DEC); dummyval++;
-  tft.setCursor((TFTWIDTH/2)+10+(DATAWIDE*3), 8+(DATAHIGH*8));
+  tft.setCursor((TFTWIDTH / 2) + 10 - 80 + (DATAWIDE * 3), 8 + (DATAHIGH * 8));
   tft.print(dummyval); dummyval++;
-  tft.setCursor((TFTWIDTH/2)+10+(DATAWIDE*3), 8+(DATAHIGH*9));
+  tft.setCursor((TFTWIDTH / 2) + 10 - 80 + (DATAWIDE * 3), 8 + (DATAHIGH * 9));
   tft.print(dummyval); dummyval++;
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Pressure, Temperature, and GPS data ****
 void updateDisplay() {
-  
+
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
 
   //updatePressureDisplay();
   updateGPSDisplay();
   //updateThermoDisplay();
-  
+
 }
 
 // **** Fxn responsible for writing headers (e.g. "Pressure:" and "Thermocouples:") to the display ****
 void writeHeaderText() {
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
-  
-  tft.setCursor(10, 8+(8*HEADTEXT*0)); // **** NOTE: a line's size is given by textsize*8 (per Adafruit_GFX library) ****
+
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 0)); // **** NOTE: a line's size is given by textsize*8 (per Adafruit_GFX library) ****
   tft.print("Pressure:");            // **** >> use of HEADTEXT to determine where to draw text based on text size ****
 
 
-  tft.setCursor(10, 8+(8*HEADTEXT*2));
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 2));
   tft.print("GPS  lat:");
-  tft.setCursor(10, 8+(8*HEADTEXT*3));
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 3));
   tft.print("GPS long:");
 
 
-  tft.setCursor(10, 8+(8*HEADTEXT*6));
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 6));
   tft.print("Thermocouples:");
 
-  tft.setCursor(10, 8+(8*HEADTEXT*8));
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 8));
   tft.print("1:");
-  tft.setCursor(10, 8+(8*HEADTEXT*9));
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 9));
   tft.print("2:");
-  tft.setCursor((TFTWIDTH/2)+10, 8+(8*HEADTEXT*8));
+  tft.setCursor((TFTWIDTH / 2) + 10 - 80, 8 + (8 * HEADTEXT * 8));
   tft.print("3:");
-  tft.setCursor((TFTWIDTH/2)+10, 8+(8*HEADTEXT*9));
+  tft.setCursor((TFTWIDTH / 2) + 10 - 80, 8 + (8 * HEADTEXT * 9));
   tft.print("4:");
-  
+
+}
+
+
+
+// **** **** **** **** //
+//                     //
+//    CLASSED  FXNS    //
+//                     //
+// **** **** **** **** //
+
+tsbutton::tsbutton(void) {
+  buffpoint = buttbuff;
+  for (int i = 0; i < BUFFMAX; i++) {
+    buttbuff[i] = false;
+  }
+  ispressed = false;
+}
+
+tsbutton::~tsbutton(void) {
+
+}
+
+bool tsbutton::buttonPress(bool bval) {
+  *buffpoint = bval;
+  buffpoint = ((buffpoint - buttbuff + 1) % BUFFMAX) + buttbuff;
+  return isPressed();
+}
+
+bool tsbutton::isPressed(void) {
+  waspressed = ispressed;
+  if (!ispressed) {
+    ispressed = true;
+    for(int i = 0; i < BUFFMAX; i++) {
+      ispressed &= buttbuff[i];
+    }
+  } else if (ispressed) {
+    ispressed = false;
+    for(int i = 0; i < BUFFMAX; i++) {
+      ispressed |= buttbuff[i];
+    }
+  }
+  return ispressed;
+}
+
+bool tsbutton::wasJustPressed(void) {
+  bool bval = (ispressed && !waspressed);
+  //waspressed = ispressed;
+  return bval;
+}
+
+bool tsbutton::wasJustReleased(void) {
+  //Serial.print("\n isp:"); Serial.print(ispressed);
+  //Serial.print("\nwasp:"); Serial.print(waspressed);
+  bool bval = (!ispressed && waspressed);
+  //waspressed = ispressed;
+  //Serial.print("\nnwsp:"); Serial.print(waspressed);
+  return bval;
 }
 

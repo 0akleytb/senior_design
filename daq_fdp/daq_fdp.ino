@@ -174,7 +174,7 @@ void loop()
   if (dataFile) 
   {
     dataFile.println("This is a test! \n");
-    datFile.print("Hour, Minute, Second, milliseconds, Day, Month, year");
+    dataFile.print("Hour, Minute, Second, milliseconds, Day, Month, year");
     dataFile.print("Fix, Quality, Latitude, Longitude, Latitude (Degrees),");
     dataFile.print("Longitude (Degrees), Speed (knots), Angle, Altitude, Satelites \n");
     dataFile.close();
