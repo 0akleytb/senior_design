@@ -13,18 +13,23 @@
 
 var model = {
     display_squeal: false,
-    something: true,
     map: null,
     markers: [],
     squeal_color: "red",
     no_squeal_color: 'green',
-    data_order: ["lat","lng","pressure","temperature","squeal"],
+    data_order: null,
+    // data_order: ["lat","lng","pressure","temperature","squeal"],
     data_array: [],
-    min_limit: null,
-    max_limit: null,
-    min_color: "#fff",
-    max_color: "#000",
+    min_limit: 100,
+    max_limit: 1000,
+    min_color: "#ff0000",
+    max_color: "#0000ff",
     gradient_direction: "to right"
+}
+
+//Consider making a views object that holds all the references to each of the UI elements. ie. squeal_button: document.getElementById("squeal_button");
+var views = {
+
 }
 
 function init(){ //Create function
@@ -33,9 +38,14 @@ function init(){ //Create function
       zoom: 17
     });
 
-    //Add event listeners
+    //Test or old event listeners
+    document.getElementById("test_button").addEventListener("click", testButton)
     document.getElementById("go_button").addEventListener("click", updateMap)
     document.getElementById("clear_button").addEventListener("click", clearMap)
+
+    //Add event listeners
+    // document.getElementById("files").addEventListener("change", readFile)       //listener for fileuploadlocation. Changing file would
+    // document.getElementById("run_button").addEventListener("click", newUpdateMap);
     document.getElementById("min_color").addEventListener("change", setMinColor)
     document.getElementById("max_color").addEventListener("change", setMaxColor)
     document.getElementById("min_limit").addEventListener("change", setMinLimit)
@@ -90,14 +100,23 @@ function readFile(callback){
         //result is a long string of the file contents. Split by newline and commas.
         rows = result.split("\n");
         //split header into array. Header is first line
-        // model.data_order = rows[0].split(",");
+        model.data_order = rows[0].split(",");
+
+        //Trim hidden characters off when reading info from a file. Refactor to use map
+        for (var i = 0, len = model.data_order.length; i < len; i++){//could have used a map here
+            model.data_order[i] = model.data_order[i].trim();
+        }
+
+        //populateDropdown
+        populateDropdown(model.data_order, "dropdown");
+
 
         //Start at index one to ignore header
-        for(var i = 0, num_rows = rows.length; i < num_rows; i++){
+        for(var i = 1, num_rows = rows.length; i < num_rows; i++){
             arr.push([]);
             var cells = rows[i].split(",");
             for(var j = 0, num_cols = cells.length; j < num_cols; j++){
-                arr[i].push(cells[j]);//Changed to i-1
+                arr[i-1].push(cells[j]);//Changed to i-1
             }
         }
         //At this point arr is a 2D array containing data passed in. Each row is a line. Each coloum in a data point.
@@ -117,10 +136,10 @@ function readFile(callback){
 }
 
 function clearMap() {
-  //model.map
-  //   init();//Simply create a new map. OR you can remove all the markers off the old map.
+
     model.data_array = [];
     clearMarkers(model.markers);
+    model.markers = [];
     //Swap out input field to clear it. Consider storing the innerHTML into a variable and simply restoring it afterward
     document.getElementById("input_field").innerHTML = '<input type="file" id="files" name="files[]" single />';
 
@@ -162,7 +181,8 @@ function addMarker(data, map) {
     var lat = Number(data.lat);
     var lng = Number(data.lng);
     var temperature = Number(data.temperature);
-    var squeal = data.squeal.trim(); //Trim string to remove any special characters like newlines or carriage returns
+    var squeal = data.squeal;
+    // var squeal = data.squeal.trim(); //Trim string to remove any special characters like newlines or carriage returns
     var color;
     var temp_percent;
     var percent;
@@ -238,17 +258,19 @@ function addMarker(data, map) {
 }
 
 function addMarkerArray(data_array, map){
-    for(var i = 0, len = data_array.length; i < len; i++){
-        addMarker(data_array[i], map);
+    if(model.markers.length === 0) {//Only add if there are no markers on the map
+        for (var i = 0, len = data_array.length; i < len; i++) {
+            addMarker(data_array[i], map);
+        }
+
+        //Extract lat and lng of first point and convert to numbers (data file is read in as a string.)
+        var lat = Number(data_array[0].lat);
+        var lng = Number(data_array[0].lng);
+
+        //Set map view to the first marker
+        map.setCenter({lat: lat, lng: lng});
+        map.setZoom(17);
     }
-
-    //Extract lat and lng of first point and convert to numbers (data file is read in as a string.)
-    var lat = Number(data_array[0].lat);
-    var lng = Number(data_array[0].lng);
-
-    //Set map view to the first marker
-    map.setCenter({lat: lat, lng: lng});
-
 }
 
 function clearMarkers(markers) {
@@ -359,8 +381,35 @@ function getGradientColor(start_color, end_color, percent) {
     return '#' + diff_red + diff_green + diff_blue;
 }
 
-function populateDropdown(){
+//http://www.plus2net.com/javascript_tutorial/list-adding.php
+function addOption(selectbox,text,value) {
+    var optn = document.createElement("OPTION");
+    optn.text = text.toUpperCase();
+    optn.value = value;
+    selectbox.options.add(optn);
 
+    //Tag created looks like: <option value="lat">LAT</option>
+}
+
+/**
+ *
+ * @param info. Array containing data to be used to populate the dropdown
+ * @param id. String ID of the element (a select tag) to be populated.
+ */
+function populateDropdown(info, id){
+    var element = document.getElementById(id);
+
+    for(var i = 0, len = info.length; i < len; i++){
+        addOption(element,info[i],info[i])
+    }
+}
+
+function testButton(){
+    console.log("Clicked Test button");
+    for (var i = 0; i < 50; i++){
+        // model.markers[i].setFillColor("#fff");
+        model.markers[i].setOptions({fillColor: "#fff"})
+    }
 }
 
 /*****************************PROGRAM LOGIC***************************************/

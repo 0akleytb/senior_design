@@ -1,6 +1,10 @@
 /* Always set the map height explicitly to define the size of the div
  * element that contains the map. */
 
+.hide {
+    display: none;
+}
+
 #app-title{
     font-size: 26px;
     padding: 0px;
@@ -30,6 +34,10 @@
 	border-radius: 0px;
 }
 
+.full-width{
+    width: 100%;
+}
+
 .half-width{
   width: 49%!important;
 }
@@ -54,7 +62,7 @@
 }
 
 #color-bar{
-    background: linear-gradient(to right, #fff , #000);
+    background: linear-gradient(to right, #ff0000 , #0000ff);
     height: 20px;
 }
 

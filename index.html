@@ -33,7 +33,7 @@
         <!--UI COlUMN-->
         <div id = "user-interface" class="col-md-3">
             <h1 id = "app-title">Maps Application</h1>
-            <p>[Instructions]: Google maps application for FDP brakes. Upload one data file containing data logged. Data file must be a csv or txt file. Different data points must be seperated by a new line and various data information at each point must be delimited by a comma. After file has been uploaded hit "Go" and data will be overlayed on map. Hover over markers to see data.</p>
+            <p>[Instructions]: Google maps application for FDP brakes. Upload one data file containing data logged. Data file must be a csv or txt file. Different data points must be seperated by a new line and various data information at each point must be delimited by a comma. After file has been uploaded hit "Go" and data will be overlayed on map. Hover over markers to see data. [Only press "RUN" when you upload a new file.]</p>
             <div id = "input_field">
                 <input type="file" id="files" name="files[]" single />
             </div>
@@ -45,11 +45,11 @@
             <div id = "data-selection">
                 <p id = "data-selection-title">Choose Data to Display: </p>
 
-                <select class="form-control" id="sel1">
-                    <option>1</option>
-                    <option>2</option>
-                    <option>3</option>
-                    <option>4</option>
+                <select class="form-control" id="dropdown">
+                    <!--<option>1</option>-->
+                    <!--<option>2</option>-->
+                    <!--<option>3</option>-->
+                    <!--<option>4</option>-->
                 </select>
 
                 <div class = "row">
@@ -81,9 +81,14 @@
             <!--<span>Gradient:</span><div id = "color-bar" style="margin-top: 10px;"></div>-->
             <!--END COLOR BAR-->
 
+
+            <button type="button" class="btn btn-info" id = "test_button">TEST</button>
+
             <div class = "bottom">
-                <button type="button" class="btn btn-primary half-width" id = "go_button">Go!</button>
-                <button type="button" class="btn btn-warning half-width" id = "clear_button">Clear</button>
+                <button type="button" class="btn btn-primary full-width hide" id = "run_button">RUN!</button>
+
+                <button type="button" class="btn btn-primary half-width " id = "go_button">Go!</button>
+                <button type="button" class="btn btn-warning half-width " id = "clear_button">Clear</button>
             </div>
 
         </div>
