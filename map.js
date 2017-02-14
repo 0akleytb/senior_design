@@ -247,10 +247,13 @@ function addMarker(data, map) {
 
     google.maps.event.addListener(circle, 'mouseover', function(event) {
         document.getElementById("data_location").innerHTML = info;
+        circle.setOptions({strokeColor: "#FFFFFF"});
+        // circle.setOptions({strokeColor: circle.color});
     });
 
     google.maps.event.addListener(circle, 'mouseout', function(event) {
         document.getElementById("data_location").innerHTML = "Data Shown Here On Hover";
+        circle.setOptions({strokeColor: circle.color});
     });
 
     //glitchy
@@ -476,6 +479,9 @@ function updateMarkersGradient(data){
 
         //setFillColor as gradientcolor
         data[i].setOptions({fillColor: color})
+
+        //
+        // data[i].color = color;
     }
 }
 
