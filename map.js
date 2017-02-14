@@ -5,7 +5,8 @@
 //Info Window on lat/lng itself: https://developers.google.com/maps/documentation/javascript/infowindows
 //Consider using info windows on lat/lng + kml overlay
 
-//TO DO: FIX CONTROLS COLUMN SO THAT IT ALSO TAKES 90% OF VIEW HEIGHT.
+//IMPROVEMENT: Remove run button and just simulate a keypress (if its not too hard) onchange of the filed field (works fine because the needed data for the RUN button has defualt values.)
+//TO DO: Fix adding options so that old option array that is longer than new options still shows old options greater than its length
 //TO DO: SET ZOOM ON WHEN ADDING MARKERS
 //TO DO: Consider making addmarker and addmarkerarray void functions that directly mutate the model map. So that using it as a callback is smoother
 //TO DO: Consider having everything except go and clear as onchange event handlers that mutate model map. Then go uses that info and updates map.
@@ -18,13 +19,21 @@ var model = {
     squeal_color: "red",
     no_squeal_color: 'green',
     data_order: null,
+    data_selected: null, //Possible values: One of the elements in data order
     // data_order: ["lat","lng","pressure","temperature","squeal"],
-    data_array: [],
+    data_array: [], //Will be filled with each data point, as an object.
     min_limit: 100,
     max_limit: 1000,
     min_color: "#ff0000",
     max_color: "#0000ff",
-    gradient_direction: "to right"
+    gradient_direction: "to right",
+    unit_map: { //Using object to map data types to their appropriate units.
+        temperature: String.fromCharCode(176) + "F",
+        pressure: "PSI"
+    },
+    object_data_array: {//Each key will be a data type (temperature,pressure,etc). Each value will be an array containing the all of those values across all of the points
+
+    }
 }
 
 //Consider making a views object that holds all the references to each of the UI elements. ie. squeal_button: document.getElementById("squeal_button");
@@ -40,16 +49,17 @@ function init(){ //Create function
 
     //Test or old event listeners
     document.getElementById("test_button").addEventListener("click", testButton)
-    document.getElementById("go_button").addEventListener("click", updateMap)
-    document.getElementById("clear_button").addEventListener("click", clearMap)
+    // document.getElementById("go_button").addEventListener("click", updateMap)
+    // document.getElementById("clear_button").addEventListener("click", clearMap)
 
     //Add event listeners
-    // document.getElementById("files").addEventListener("change", readFile)       //listener for fileuploadlocation. Changing file would
-    // document.getElementById("run_button").addEventListener("click", newUpdateMap);
+    document.getElementById("files").addEventListener("change", readFilePopulateDropdown)       //listener for fileuploadlocation. Changing file would
+    document.getElementById("dropdown").addEventListener("change", setDataSelected)       //listener for fileuploadlocation. Changing file would
     document.getElementById("min_color").addEventListener("change", setMinColor)
     document.getElementById("max_color").addEventListener("change", setMaxColor)
     document.getElementById("min_limit").addEventListener("change", setMinLimit)
     document.getElementById("max_limit").addEventListener("change", setMaxLimit)
+    document.getElementById("run_button").addEventListener("click", newUpdateMap);
     // document.getElementById('files').addEventListener('change', showFiles, false);
     // document.getElementById("squeal_button").addEventListener("click", updateMap) //Squeal switch. Instead maybe have the layers that they wanted.
     // document.getElementById("files").addEventListener("change", readFile)       //listener for fileuploadlocation. Changing file would
@@ -70,16 +80,18 @@ function readUI() {
 
 }
 
-function updateMap() {
-  //   readUI() ; //Read layer selection. Use dropdown selection
-    //To DO: Call AddMarkerArray as an optional callback in readFile (Use JS pattern in JS Patterns book)
-    readFile(addMarkerArray); //readFile's affect on model.data_array is asynchrous so have to either pass methods that depend on its affect as callbacks, therefore cannot call addArrayMarker after hoping that model.data_array has been updated
-    // console.log("In UpdateMap Function model.data_array is : ", model.data_array);
-    // addMarkerArray(model.data_array,model.map);
+
+function newUpdateMap(){
+    if(model.markers.length !== 0) {//If markers on map clear
+        clearMarkers(model.markers);
+        model.markers = [];
+    }
+
+    addMarkerArray(model.data_array,model.map);
 }
 
-//TO DO: PASS MARKER ARRAY AS A CALLBACK
-function readFile(callback){
+
+function readFilePopulateDropdown(callback){
 
     var UploadFileLocation = document.getElementById("files");
 
@@ -107,9 +119,6 @@ function readFile(callback){
             model.data_order[i] = model.data_order[i].trim();
         }
 
-        //populateDropdown
-        populateDropdown(model.data_order, "dropdown");
-
 
         //Start at index one to ignore header
         for(var i = 1, num_rows = rows.length; i < num_rows; i++){
@@ -125,9 +134,15 @@ function readFile(callback){
         // console.log(model.data_array);
         // addMarkerArray(model.data_array,model.map);
 
+        //Fill object array
+        model.object_data_array = fillObjectDataArray();
+
+        //populateDropdown
+        populateDropdown(model.data_order, "dropdown");
+
         //callback
         if (callback) {
-            callback(model.data_array,model.map);
+            callback();
         }
 
     }
@@ -202,13 +217,12 @@ function addMarker(data, map) {
     //     color = model.no_squeal_color;
     // }
 
-
-    //Static data gradient display
-    difference = Math.max(temperature - min_limit, 0); //Choose max of the two to make sure not negative
-    temp_percent = difference*1.0/(max_limit - min_limit); //Float division since 1.0 //Temp_percent could be greater than 1
-    percent = Math.min(temp_percent, 1);
-
-    color = getGradientColor(min_color, max_color, percent);
+    // //Static data gradient display
+    // difference = Math.max(temperature - min_limit, 0); //Choose max of the two to make sure not negative
+    // temp_percent = difference*1.0/(max_limit - min_limit); //Float division since 1.0 //Temp_percent could be greater than 1
+    // percent = Math.min(temp_percent, 1);
+    //
+    // color = getGradientColor(min_color, max_color, percent);
 
     /**Future implementation of updating color based on min max colors
      *
@@ -229,7 +243,7 @@ function addMarker(data, map) {
         // radius: Math.sqrt(citymap[city].population) * 100
     });
 
-    circle.info = info; //Could use the info property later.
+    circle.data = data; //Could use the data property later.
 
     google.maps.event.addListener(circle, 'mouseover', function(event) {
         document.getElementById("data_location").innerHTML = info;
@@ -258,19 +272,21 @@ function addMarker(data, map) {
 }
 
 function addMarkerArray(data_array, map){
-    if(model.markers.length === 0) {//Only add if there are no markers on the map
-        for (var i = 0, len = data_array.length; i < len; i++) {
-            addMarker(data_array[i], map);
-        }
-
-        //Extract lat and lng of first point and convert to numbers (data file is read in as a string.)
-        var lat = Number(data_array[0].lat);
-        var lng = Number(data_array[0].lng);
-
-        //Set map view to the first marker
-        map.setCenter({lat: lat, lng: lng});
-        map.setZoom(17);
+    for (var i = 0, len = data_array.length; i < len; i++) {
+        addMarker(data_array[i], map);
     }
+
+    //Extract lat and lng of first point and convert to numbers (data file is read in as a string.)
+    var lat = Number(data_array[0].lat);
+    var lng = Number(data_array[0].lng);
+
+    //Set gradient
+    updateMarkersGradient(model.markers);
+
+    //Set map view to the first marker
+    map.setCenter({lat: lat, lng: lng});
+    map.setZoom(17);
+
 }
 
 function clearMarkers(markers) {
@@ -297,13 +313,6 @@ function create_object_array(data_order, data){
     return object_array;
 }
 
-function setMinColor(e){
-    model.min_color = e.target.value;
-    var gradient = document.getElementById("color-bar");
-    gradient.style.background = 'linear-gradient('+ model.gradient_direction + ', ' + model.min_color + ', ' + model.max_color+ ')';
-
-}
-
 function setColor(e){
     model.min_color = e.target.value || "#fff";
     model.max_color = e.target.value || "#000";
@@ -312,20 +321,52 @@ function setColor(e){
 
 }
 
+function setMinColor(e){
+    model.min_color = e.target.value;
+    var gradient = document.getElementById("color-bar");
+    gradient.style.background = 'linear-gradient('+ model.gradient_direction + ', ' + model.min_color + ', ' + model.max_color+ ')';
+    updateMarkersGradient(model.markers);
+}
+
+
+
 function setMaxColor(e){
     model.max_color = e.target.value;
     var gradient = document.getElementById("color-bar");
     gradient.style.background = 'linear-gradient('+ model.gradient_direction + ', ' + model.min_color + ', ' + model.max_color+ ')';
+    updateMarkersGradient(model.markers);
 }
 
 function setMinLimit(e){
     model.min_limit = e.target.value;
     console.log(model.min_limit);
+    updateMarkersGradient(model.markers);
 }
 
 function setMaxLimit(e){
     model.max_limit = e.target.value;
     console.log(model.max_limit);
+    updateMarkersGradient(model.markers);
+}
+
+function setDataSelected(e){
+    var data = model.data_array;
+    var order = model.data_order;
+    var object_array = model.object_data_array;
+    var min_limit = model.min_limit;
+    var max_limit = model.max_limit;
+
+    model.data_selected = e.target.value;
+    console.log(model.data_selected);
+
+    model.min_limit = Math.min.apply(null, object_array[model.data_selected]);
+    model.max_limit = Math.max.apply(null, object_array[model.data_selected]);
+
+    document.getElementById("min_limit").value = model.min_limit;
+    document.getElementById("max_limit").value = model.max_limit;
+
+    //Update Gradient
+    updateMarkersGradient(model.markers);
 }
 
 /**
@@ -382,11 +423,12 @@ function getGradientColor(start_color, end_color, percent) {
 }
 
 //http://www.plus2net.com/javascript_tutorial/list-adding.php
-function addOption(selectbox,text,value) {
+function addOption(selectbox,text,value,index) {
     var optn = document.createElement("OPTION");
     optn.text = text.toUpperCase();
     optn.value = value;
-    selectbox.options.add(optn);
+    selectbox.options[index] = optn;
+    // selectbox.options.add(optn);
 
     //Tag created looks like: <option value="lat">LAT</option>
 }
@@ -398,10 +440,14 @@ function addOption(selectbox,text,value) {
  */
 function populateDropdown(info, id){
     var element = document.getElementById(id);
-
+    element.options = [];
     for(var i = 0, len = info.length; i < len; i++){
-        addOption(element,info[i],info[i])
+        addOption(element,info[i],info[i],i)
     }
+
+    //Manually fire an onchange event to updata data selected. Doesnt update by itself when adding an option
+    var event = new Event('change');
+    element.dispatchEvent(event);
 }
 
 function testButton(){
@@ -412,5 +458,57 @@ function testButton(){
     }
 }
 
+function updateMarkersGradient(data){
+    var difference, temp_percent, percent,color;
+    var min_limit = model.min_limit;
+    var min_color = model.min_color;
+    var max_limit = model.max_limit;
+    var max_color = model.max_color;
+    var data_selected;
+
+    for(var i = 0, len = data.length; i < len; i++){
+        data_selected = data[i].data[model.data_selected];
+        difference = Math.max(data_selected - min_limit, 0); //Choose max of the two to make sure not negative
+        temp_percent = difference*1.0/(max_limit - min_limit); //Float division since 1.0 //Temp_percent could be greater than 1
+        percent = Math.min(temp_percent, 1);
+
+        color = getGradientColor(min_color, max_color, percent);
+
+        //setFillColor as gradientcolor
+        data[i].setOptions({fillColor: color})
+    }
+}
+
+
+function fillObjectDataArray(){
+    var object = {};
+
+    var data = model.data_array;
+    var order = model.data_order;
+    var temp;
+    // var object_array = model.object_data_array; // Object containing arrays
+
+    for(var k = 0, len = order.length; k < len; k++){
+        object[order[k]] = [];
+    }
+
+    for(var i = 0, len = data.length; i < len; i++){
+        for(var j = 0, order_len = order.length; j < order_len; j++){
+            //Store corresponding property data in temp.
+            temp = data[i][order[j]];
+            // Create member properties in model.data_order and push the corresponding property info for each marker into an array.
+            object[order[j]].push(temp);
+        }
+    }
+
+    return object;
+}
+
+// function dataStatistics(data_array, property){
+//     //Find min of the related data
+//
+//     Math.max(null, data_array)
+//
+// }
 /*****************************PROGRAM LOGIC***************************************/
 init();
