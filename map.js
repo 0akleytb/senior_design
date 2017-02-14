@@ -232,9 +232,10 @@ function addMarker(data, map) {
 
     //USING CIRCLES
     var circle = new google.maps.Circle({
+        strokePosition: google.maps.StrokePosition.INSIDE,
         // strokeColor: '#FF0000',
-        strokeOpacity: 0.1,
-        // strokeWeight: 2,
+        strokeOpacity: 0,
+        strokeWeight: 2,
         fillColor: color,
         fillOpacity: 0.95,
         map: map,
@@ -244,32 +245,9 @@ function addMarker(data, map) {
     });
 
     circle.data = data; //Could use the data property later.
+    circle.info = info; //Could use the data property later.
 
-    google.maps.event.addListener(circle, 'mouseover', function(event) {
-        document.getElementById("data_location").innerHTML = info;
-        circle.setOptions({strokeColor: "#FFFFFF"});
-        // circle.setOptions({strokeColor: circle.color});
-    });
-
-    google.maps.event.addListener(circle, 'mouseout', function(event) {
-        document.getElementById("data_location").innerHTML = "Data Shown Here On Hover";
-        circle.setOptions({strokeColor: circle.color});
-    });
-
-    //glitchy
-    // google.maps.event.addListener(circle, 'mouseover', function(event) {
-    //     document.getElementById("data_location").innerHTML = info;
-    //     // circle.strokeColor = "#F0FFFF";
-    //     circle.set("strokeColor", "#F0FFFF");
-    // });
-    //
-    //
-    // google.maps.event.addListener(circle, 'mouseout', function(event) {
-    //     document.getElementById("data_location").innerHTML = info;
-    //     // circle.strokeColor = "#F0FFFF";
-    //     circle.set("strokeColor","FF0000");
-    // });
-
+    //Store circles in marker array
     model.markers.push(circle);
 
 }
@@ -285,6 +263,10 @@ function addMarkerArray(data_array, map){
 
     //Set gradient
     updateMarkersGradient(model.markers);
+
+    //Set listeners
+    // addMarkerEventListeners(model.markers);
+    addMarkerEventListeners();
 
     //Set map view to the first marker
     map.setCenter({lat: lat, lng: lng});
@@ -358,6 +340,7 @@ function setDataSelected(e){
     var object_array = model.object_data_array;
     var min_limit = model.min_limit;
     var max_limit = model.max_limit;
+    var elements;
 
     model.data_selected = e.target.value;
     console.log(model.data_selected);
@@ -370,6 +353,14 @@ function setDataSelected(e){
 
     //Update Gradient
     updateMarkersGradient(model.markers);
+
+    //Update Units
+    elements = document.getElementsByClassName("units")
+    for(var i = 0, len = elements.length; i < len; i++){
+        if (model.unit_map[model.data_selected] != undefined) {
+            elements[i].innerHTML = model.unit_map[model.data_selected];
+        }
+    }
 }
 
 /**
@@ -480,10 +471,27 @@ function updateMarkersGradient(data){
         //setFillColor as gradientcolor
         data[i].setOptions({fillColor: color})
 
-        //
-        // data[i].color = color;
+        //Add a color property to each marker resembling its gradient color
+        data[i].color = color;
     }
 }
+
+
+function addMarkerEventListeners(){
+    for(var i = 0, len = model.markers.length; i < len; i++) {
+        model.markers[i].addListener('mouseover', function() {
+            document.getElementById("data_location").innerHTML = this.info;
+            //Consider setting zIndex as well.
+            this.setOptions({strokeOpacity: 1, strokeColor: "#000", strokeWeight: 5});
+        });
+
+        model.markers[i].addListener('mouseout', function() {
+            document.getElementById("data_location").innerHTML = "Data Shown Here On Hover";
+            this.setOptions({strokeOpacity: 0});
+        });
+    }
+}
+
 
 
 function fillObjectDataArray(){

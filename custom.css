@@ -5,6 +5,10 @@
     display: none;
 }
 
+.units{
+    font-size: 12px;
+}
+
 #app-title{
     font-size: 26px;
     padding: 0px;
