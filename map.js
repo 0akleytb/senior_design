@@ -5,12 +5,13 @@
 //Info Window on lat/lng itself: https://developers.google.com/maps/documentation/javascript/infowindows
 //Consider using info windows on lat/lng + kml overlay
 
+
+//TO DO: Add squeals as beach flags. Markers with icons. Place a member property that will be checked in gradient function so that squeals/markers will be ignored
+
 //IMPROVEMENT: Remove run button and just simulate a keypress (if its not too hard) onchange of the filed field (works fine because the needed data for the RUN button has defualt values.)
 //TO DO: Fix adding options so that old option array that is longer than new options still shows old options greater than its length
-//TO DO: SET ZOOM ON WHEN ADDING MARKERS
 //TO DO: Consider making addmarker and addmarkerarray void functions that directly mutate the model map. So that using it as a callback is smoother
-//TO DO: Consider having everything except go and clear as onchange event handlers that mutate model map. Then go uses that info and updates map.
-//TO DO: Currently if used select would have to clear and add markers every time I want to display specific data since event listeners to show info is added when markers are added
+
 
 var model = {
     display_squeal: false,
@@ -72,6 +73,10 @@ function init(){ //Create function
     else {
         alert('The File APIs are not fully supported in this browser.');
     }
+
+    //Show Default gradient values
+    document.getElementById("min_color").value = model.min_color;
+    document.getElementById("max_color").value = model.max_color;
 
 }
 
@@ -139,6 +144,17 @@ function readFilePopulateDropdown(callback){
 
         //populateDropdown
         populateDropdown(model.data_order, "dropdown");
+
+
+        //Send a click event on RUN, testing right now
+
+        var clickEvent = new MouseEvent("click", {
+            "view": window,
+            "bubbles": true,
+            "cancelable": false
+        });
+
+        document.getElementById("run_button").dispatchEvent(clickEvent);
 
         //callback
         if (callback) {
@@ -360,6 +376,9 @@ function setDataSelected(e){
         if (model.unit_map[model.data_selected] != undefined) {
             elements[i].innerHTML = model.unit_map[model.data_selected];
         }
+        else {
+            elements[i].innerHTML = "*";
+        }
     }
 }
 
@@ -372,6 +391,51 @@ function setDataSelected(e){
  * @returns {string}
  */
 function getGradientColor(start_color, end_color, percent) {
+    // strip the leading # if it's there
+    start_color = start_color.replace(/^\s*#|\s*$/g, '');
+    end_color = end_color.replace(/^\s*#|\s*$/g, '');
+
+    // convert 3 char codes --> 6, e.g. `E0F` --> `EE00FF`
+    if(start_color.length == 3){
+        start_color = start_color.replace(/(.)/g, '$1$1');
+    }
+
+    if(end_color.length == 3){
+        end_color = end_color.replace(/(.)/g, '$1$1');
+    }
+
+    // get colors
+    var start_red = parseInt(start_color.substr(0, 2), 16),
+        start_green = parseInt(start_color.substr(2, 2), 16),
+        start_blue = parseInt(start_color.substr(4, 2), 16);
+
+    var end_red = parseInt(end_color.substr(0, 2), 16),
+        end_green = parseInt(end_color.substr(2, 2), 16),
+        end_blue = parseInt(end_color.substr(4, 2), 16);
+
+    // calculate new color
+    var diff_red = end_red - start_red;
+    var diff_green = end_green - start_green;
+    var diff_blue = end_blue - start_blue;
+
+    diff_red = ( (diff_red * percent) + start_red ).toString(16).split('.')[0];
+    diff_green = ( (diff_green * percent) + start_green ).toString(16).split('.')[0];
+    diff_blue = ( (diff_blue * percent) + start_blue ).toString(16).split('.')[0];
+
+    // ensure 2 digits by color
+    if( diff_red.length == 1 )
+        diff_red = '0' + diff_red
+
+    if( diff_green.length == 1 )
+        diff_green = '0' + diff_green
+
+    if( diff_blue.length == 1 )
+        diff_blue = '0' + diff_blue
+
+    return '#' + diff_red + diff_green + diff_blue;
+}
+
+function getGradientColorWithColorNames(start_color, end_color, percent) {
     // strip the leading # if it's there
     start_color = start_color.replace(/^\s*#|\s*$/g, '');
     end_color = end_color.replace(/^\s*#|\s*$/g, '');
@@ -436,7 +500,10 @@ function populateDropdown(info, id){
     var element = document.getElementById(id);
     element.options = [];
     for(var i = 0, len = info.length; i < len; i++){
-        addOption(element,info[i],info[i],i)
+        //Only add if not a squeal. Figure out a way to have this not hardcoded. Probably an array of items, in model, you dont want to include.
+        if (info[i] != "squeal") {//If info[i] is not found in dont_show array
+            addOption(element, info[i], info[i], i)
+        }
     }
 
     //Manually fire an onchange event to updata data selected. Doesnt update by itself when adding an option
@@ -455,10 +522,13 @@ function testButton(){
 function updateMarkersGradient(data){
     var difference, temp_percent, percent,color;
     var min_limit = model.min_limit;
-    var min_color = model.min_color;
     var max_limit = model.max_limit;
-    var max_color = model.max_color;
     var data_selected;
+
+    //Changes HTML5 Colornames to hex values, and leaves them as hex as so
+    var min_color = colorToHex(model.min_color);
+    var max_color = colorToHex(model.max_color);
+
 
     for(var i = 0, len = data.length; i < len; i++){
         data_selected = data[i].data[model.data_selected];
@@ -524,5 +594,45 @@ function fillObjectDataArray(){
 //     Math.max(null, data_array)
 //
 // }
+
+
+
+/**************************HTML COLORNAMES FUNCION ****************/
+function colorToRGBA(color) {
+    // Returns the color as an array of [r, g, b, a] -- all range from 0 - 255
+    // color must be a valid canvas fillStyle. This will cover most anything
+    // you'd want to use.
+    // Examples:
+    // colorToRGBA('red')  # [255, 0, 0, 255]
+    // colorToRGBA('#f00') # [255, 0, 0, 255]
+    var cvs, ctx;
+    cvs = document.createElement('canvas');
+    cvs.height = 1;
+    cvs.width = 1;
+    ctx = cvs.getContext('2d');
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 1, 1);
+    return ctx.getImageData(0, 0, 1, 1).data;
+}
+
+function byteToHex(num) {
+    // Turns a number (0-255) into a 2-character hex number (00-ff)
+    return ('0'+num.toString(16)).slice(-2);
+}
+
+function colorToHex(color) {
+    // Convert any CSS color to a hex representation
+    // Examples:
+    // colorToHex('red')            # '#ff0000'
+    // colorToHex('rgb(255, 0, 0)') # '#ff0000'
+    var rgba, hex;
+    rgba = colorToRGBA(color);
+    hex = [0,1,2].map(
+        function(idx) { return byteToHex(rgba[idx]); }
+    ).join('');
+    return "#"+hex;
+}
+
+
 /*****************************PROGRAM LOGIC***************************************/
 init();
