@@ -24,6 +24,15 @@
 #define LCD_RD A0
 #define LCD_RESET A6
 
+// Thermocouple Amp-out Pins
+#define Thermo1 8
+#define Thermo2 9
+#define Thermo3 10
+#define Thermo4 11
+
+// Thermocouple Parameters
+#define Vref 1.25
+
 // Hardware Serialport
 #define GPSSerial Serial1
 #define Dir "Datalogging"
@@ -105,7 +114,7 @@ class tsbutton {
 // GLOBALS //
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, 258);
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
-int dummyval = 1234;
+int dummyval = 1234, cyclecounter = 0;
 bool logging = false, isSqueal = false, wasSqueal = false;
 tsbutton startButton, squealButton;
 
@@ -133,6 +142,7 @@ uint32_t timer = millis();
 
 // PROTOTYPES //
 void useInterrupt(boolean v);
+float thermoTxform(int pin);
 
 
 
@@ -204,7 +214,7 @@ void setup() {
   while (SD.exists(fileName))
    {
        fileName = dtlog;
-       count++;
+       count += 1;
        fileName += count;
        fileName += ext; 
    }
@@ -222,11 +232,11 @@ void setup() {
   if (dataFile) 
   {
     dataFile.println("This is a test");
-    //Serial.print("\n This part was not skipped");
+    Serial.print("\n This part was not skipped");
     
-    dataFile.print("Hour, Minute, Second, milliseconds, Day, Month, year");
-    dataFile.print("Fix, Quality, Latitude, Longitude, Latitude (Degrees),");
-    dataFile.print("Longitude (Degrees), Speed (knots), Angle, Altitude, Satelites \n");
+    dataFile.print("Hour,Minute,Second,Milliseconds,Day,Month,Year,");
+    dataFile.print("Fix,Quality,Latitude,,Latitude (Degrees),Longitude,,");
+    dataFile.print("Longitude (Degrees),Speed (knots),Angle,Altitude,Satellites\n");
     dataFile.close();
 
   }
@@ -293,11 +303,11 @@ void loop() {
   dataFile.print((int)GPS.fixquality); dataFile.print(",");
   dataFile.print(GPS.latitude, 4); dataFile.print(",");
   dataFile.print(GPS.lat);dataFile.print(",");
+  dataFile.print(GPS.latitudeDegrees, 4);dataFile.print(",");
   dataFile.print(GPS.longitude, 4);dataFile.print(",");
   dataFile.print(GPS.lon);dataFile.print(",");
-  dataFile.print(GPS.latitudeDegrees, 4);dataFile.print(",");
-  dataFile.print(", "); dataFile.print(",");
-  dataFile.print(GPS.longitudeDegrees, 4);  dataFile.print(",");   
+  dataFile.print(GPS.longitudeDegrees, 4);  dataFile.print(","); 
+  dataFile.print(", "); dataFile.print(",");  
   dataFile.print(GPS.speed);dataFile.print(",");
   dataFile.print(GPS.angle);dataFile.print(",");
   dataFile.print(GPS.altitude);dataFile.print(",");
@@ -358,8 +368,12 @@ void loop() {
     drawSquealButton();
     isSqueal = false;
   }
-  
 
+  if (cyclecounter < 64) cyclecounter++; else {
+    updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon);
+    updateThermoDisplay();
+    cyclecounter = 0;
+  }
 }
 
 
@@ -471,26 +485,36 @@ void updatePressureDisplay() {
 }
 
 // **** Fxn responsible for updating display with most recent/relevant GPS data ****
-void updateGPSDisplay() {
-  tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 2));
-  tft.fillRect(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 2), 8 * DATAWIDE, 2 * DATAHIGH, BACKCOLOR);
-  tft.print(dummyval, DEC); dummyval++;
-  tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 3));
-  tft.print(dummyval, DEC); dummyval++;
+void updateGPSDisplay(float latitude, char lat, float longitude, char lon) {
+  tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 2));
+  tft.setTextColor(BLACK);
+  tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 2), 10 * DATAWIDE, 2 * DATAHIGH, BACKCOLOR);
+  if (latitude >= 0) tft.print(" ");
+    tft.print(latitude, 4);
+    tft.print(" ");
+    tft.print(lat);
+  tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 3));
+  if (longitude >= 0) tft.print(" ");
+    tft.print(longitude, 4);
+    tft.print(" ");
+    tft.print(lon);
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Temperature values ****
 void updateThermoDisplay() {
-  tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 8), 8 * DATAWIDE, 2 * DATAHIGH, BACKCOLOR);
-  tft.fillRect((TFTWIDTH / 2) + 10 - 80 + (DATAWIDE * 3), 8 + (DATAHIGH * 8), 8 * DATAWIDE, 2 * DATAHIGH, BACKCOLOR);
+  tft.setTextColor(BLACK);
+  tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 8), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
   tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 8));
-  tft.print(dummyval, DEC); dummyval++;
+  tft.print(thermoTxform(Thermo1), 1);
+  tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 9), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
   tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 9));
-  tft.print(dummyval, DEC); dummyval++;
-  tft.setCursor((TFTWIDTH / 2) + 10 - 80 + (DATAWIDE * 3), 8 + (DATAHIGH * 8));
-  tft.print(dummyval); dummyval++;
-  tft.setCursor((TFTWIDTH / 2) + 10 - 80 + (DATAWIDE * 3), 8 + (DATAHIGH * 9));
-  tft.print(dummyval); dummyval++;
+  tft.print(thermoTxform(Thermo1), 1);
+  tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 10), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 10));
+  tft.print(thermoTxform(Thermo1), 1);
+  tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 11), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 11));
+  tft.print(thermoTxform(Thermo1), 1);
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Pressure, Temperature, and GPS data ****
@@ -500,7 +524,7 @@ void updateDisplay() {
   tft.setTextSize(HEADTEXT);
 
   //updatePressureDisplay();
-  updateGPSDisplay();
+  updateGPSDisplay(0, 'c', 0, 'c');
   //updateThermoDisplay();
 
 }
@@ -515,9 +539,9 @@ void writeHeaderText() {
 
 
   tft.setCursor(10, 8 + (8 * HEADTEXT * 2));
-  tft.print("GPS  lat:");
+  tft.print("Lat:");
   tft.setCursor(10, 8 + (8 * HEADTEXT * 3));
-  tft.print("GPS long:");
+  tft.print("Lon:");
 
 
   tft.setCursor(10, 8 + (8 * HEADTEXT * 6));
@@ -527,13 +551,23 @@ void writeHeaderText() {
   tft.print("1:");
   tft.setCursor(10, 8 + (8 * HEADTEXT * 9));
   tft.print("2:");
-  tft.setCursor((TFTWIDTH / 2) + 10 - 80, 8 + (8 * HEADTEXT * 8));
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 10));
   tft.print("3:");
-  tft.setCursor((TFTWIDTH / 2) + 10 - 80, 8 + (8 * HEADTEXT * 9));
+  tft.setCursor(10, 8 + (8 * HEADTEXT *11));
   tft.print("4:");
 
 }
 
+// Transforms analog reading of specified pin into temperature in degrees Fahrenheit
+float thermoTxform(int pin) {
+  int pinval = analogRead(pin);
+  float voltage = map(pinval, 0, 1023, 0.0, 5.0);
+  voltage = ((float)pinval*5.0)/1024.0;
+  Serial.print("\nPinval at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(pinval);
+  Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
+  float degC = (voltage-Vref)/0.005;
+  return ((degC*9)/5)+32;
+}
 
 
 // **** **** **** **** //
@@ -581,18 +615,6 @@ bool tsbutton::wasJustPressed(void) {
   //waspressed = ispressed;
   return bval;
 }
-/* */
-float VoltToTempConv(int sensorValue)
-{
-   // Convert the analog reading (which goes from 0 - 1023) to a voltage (0 - 5V):
-  float voltage = sensorValue * (5.0 / 1023.0);
-  // Convert the voltage to temperature
-  float temp = (voltage - 1.25)/(0.005);
-
-  return temp;
-    
-}
-
 
 bool tsbutton::wasJustReleased(void) {
   //Serial.print("\n isp:"); Serial.print(ispressed);
