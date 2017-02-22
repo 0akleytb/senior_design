@@ -33,6 +33,9 @@
 // Thermocouple Parameters
 #define Vref 1.25
 
+// Pressure Transmitter Circuit Pin
+#define Pressure1 12
+
 // Hardware Serialport
 #define GPSSerial Serial1
 #define Dir "Datalogging"
@@ -143,6 +146,7 @@ uint32_t timer = millis();
 // PROTOTYPES //
 void useInterrupt(boolean v);
 float thermoTxform(int pin);
+float pressureTxform(int pin);
 
 
 
@@ -279,6 +283,7 @@ void loop() {
   {
       if (!GPS.parse(GPS.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
          ;// return;  // we can fail to parse a sentence in which case we should just wait for another
+      //stuff
   }
 
   // if millis() or timer wraps around, we'll just reset it
@@ -290,7 +295,7 @@ void loop() {
   /* open the file. note that only one file can be open at a time,
    *  so you have to close this one before opening another.
    */
-   
+  
   dataFile = SD.open(fileName, FILE_WRITE);
   dataFile.print(GPS.hour); dataFile.print(",");
   dataFile.print(GPS.minute);dataFile.print(",");
@@ -315,8 +320,6 @@ void loop() {
   dataFile.print("\n");
   dataFile.close();
 
-
-
   // **** Display Branch Loop Code ****
   
   if (MINPRESSURE < p.z && p.z < MAXPRESSURE) {
@@ -338,7 +341,6 @@ void loop() {
       } else { // **** squeal button pressed, while NOT data-logging ****
         startButton.buttonPress(false);
         squealButton.buttonPress(false);
-        updateDisplay();
       }
     } else { // **** NO BUTTON PRESSED ****
       startButton.buttonPress(false);
@@ -348,19 +350,7 @@ void loop() {
     startButton.buttonPress(false);
     squealButton.buttonPress(false);
   }
-  
-  /*
-  isSqueal = squealButton.isPressed();
-  // **** Draw a square in the bottom right of the display to indicate squeal has started ****
-  // **** >> erase when squeal has ended, and ignore otherwise ****
-  if (isSqueal && !wasSqueal) {
-    tft.fillRect(TFTWIDTH - BOXSIZE, TFTHEIGHT - BOXSIZE, TFTWIDTH, TFTHEIGHT, TESTCOLOR);
-  } else if (wasSqueal && ! isSqueal) {
-    tft.fillRect(TFTWIDTH - BOXSIZE, TFTHEIGHT - BOXSIZE, TFTWIDTH, TFTHEIGHT, BACKCOLOR);
-  }
-  wasSqueal = isSqueal;
-  */
-  
+ 
   if (squealButton.wasJustPressed()) {
     drawSquealButton();
     isSqueal = true;
@@ -369,9 +359,10 @@ void loop() {
     isSqueal = false;
   }
 
-  if (cyclecounter < 64) cyclecounter++; else {
+  if (cyclecounter < 256) cyclecounter++; else {
     updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon);
     updateThermoDisplay();
+    updatePressureDisplay();
     cyclecounter = 0;
   }
 }
@@ -436,8 +427,10 @@ void useInterrupt(boolean v) {
   }
 }
 
-// **** Fxn responsible for (re)drawing Start/Stop button ****
+// **** Fxn responsible for (re)drawing Start/Stop and Squeal buttons ****
 void drawButtons() {
+
+  // Drawing Start/Stop button
   tft.setTextSize(4);
   tft.setCursor(TFTWIDTH - BOXWIDE + 20, 40);
   if (logging) {
@@ -449,6 +442,8 @@ void drawButtons() {
     tft.setTextColor(BLACK);
     tft.print("Start");
   }
+
+  // Drawing Squeal button
   drawSquealButton();
 }
 
@@ -481,7 +476,7 @@ void drawSquealButton() {
 void updatePressureDisplay() {
   tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 0));
   tft.fillRect(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 0), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
-  tft.print(dummyval, DEC); dummyval++;
+  tft.print(pressureTxform(Pressure1), 1);
 }
 
 // **** Fxn responsible for updating display with most recent/relevant GPS data ****
@@ -524,7 +519,7 @@ void updateDisplay() {
   tft.setTextSize(HEADTEXT);
 
   //updatePressureDisplay();
-  updateGPSDisplay(0, 'c', 0, 'c');
+  //updateGPSDisplay(0, 'c', 0, 'c');
   //updateThermoDisplay();
 
 }
@@ -535,7 +530,7 @@ void writeHeaderText() {
   tft.setTextSize(HEADTEXT);
 
   tft.setCursor(10, 8 + (8 * HEADTEXT * 0)); // **** NOTE: a line's size is given by textsize*8 (per Adafruit_GFX library) ****
-  tft.print("Pressure:");            // **** >> use of HEADTEXT to determine where to draw text based on text size ****
+  tft.print("Pressure:");                    // **** >> use of HEADTEXT to determine where to draw text based on text size ****
 
 
   tft.setCursor(10, 8 + (8 * HEADTEXT * 2));
@@ -553,7 +548,7 @@ void writeHeaderText() {
   tft.print("2:");
   tft.setCursor(10, 8 + (8 * HEADTEXT * 10));
   tft.print("3:");
-  tft.setCursor(10, 8 + (8 * HEADTEXT *11));
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 11));
   tft.print("4:");
 
 }
@@ -561,12 +556,21 @@ void writeHeaderText() {
 // Transforms analog reading of specified pin into temperature in degrees Fahrenheit
 float thermoTxform(int pin) {
   int pinval = analogRead(pin);
-  float voltage = map(pinval, 0, 1023, 0.0, 5.0);
-  voltage = ((float)pinval*5.0)/1024.0;
+  float voltage = ((float)pinval * 5.0) / 1024.0;
   Serial.print("\nPinval at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(pinval);
   Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
-  float degC = (voltage-Vref)/0.005;
-  return ((degC*9)/5)+32;
+  float degC = (voltage - Vref) / 0.005;
+  return ((degC * 9) / 5) + 32;
+}
+
+// Transforms analog reading of specified pin into relative pressure in psi
+float pressureTxform(int pin) {
+  int pinval = analogRead(pin);
+  float voltage = ((float)pinval * 5.0) / 1024.0;
+  Serial.print("\nPinval at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(pinval);
+  Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
+  float psi = ((-0.8 + voltage) * 1000.0) / 3.2;
+  return psi;
 }
 
 
