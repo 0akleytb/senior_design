@@ -25,16 +25,26 @@
 #define LCD_RESET A6
 
 // Thermocouple Amp-out Pins
-#define Thermo1 8
-#define Thermo2 9
-#define Thermo3 10
+#define NUMTHERMOS 4     // Best to not exceed 4 thermos.
+#define Thermo1 8        // Changes to number of pin definitions may not have intended
+#define Thermo2 9        //   effect if NUMTHERMOS and in-the-loop transformations 
+#define Thermo3 10       //   (thermoTxform(...)) are not adjusted accordingly
 #define Thermo4 11
 
 // Thermocouple Parameters
 #define Vref 1.25
 
-// Pressure Transmitter Circuit Pin
-#define Pressure1 12
+// Pressure Transmitter Circuit Pin(s)
+#define NUMPRESSURES 1
+#define Pressure1 12     // Changes to number of pin definitions may not have intended
+                         //   effect if NUMPRESSURES and in-the-loop transformations
+                         //   (pressureTxform(...)) are not adjusted accordingly
+
+// Pressure Transmitter Parameters
+#define MIN_P_VOLTAGE 0.8
+#define MAX_P_VOLTAGE 4.0
+#define MIN_P_PSI 0.0
+#define MAX_P_PSI 1000.0
 
 // Hardware Serialport
 #define GPSSerial Serial1
@@ -120,6 +130,8 @@ Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 int dummyval = 1234, cyclecounter = 0;
 bool logging = false, isSqueal = false, wasSqueal = false;
 tsbutton startButton, squealButton;
+float thermocouples[NUMTHERMOS];
+float pressuretxers[NUMPRESSURES];
 
 // Connect to the GPS on hardware serial
 Adafruit_GPS GPS(&GPSSerial);
@@ -271,9 +283,15 @@ void setup() {
 
 void loop() {
   
+  /* Retrieve new temperature and pressure values once per cycle */
+  thermocouples[0] = thermoTxform(Thermo1);
+  thermocouples[1] = thermoTxform(Thermo2);
+  thermocouples[2] = thermoTxform(Thermo3);
+  thermocouples[3] = thermoTxform(Thermo4);
+  pressuretxers[0] = pressureTxform(Pressure1);
+  
   TSPoint p = ts.getPoint();
   int coord;
-
 
 
   // **** Main Branch Loop Code ****
@@ -361,8 +379,8 @@ void loop() {
 
   if (cyclecounter < 256) cyclecounter++; else {
     updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon);
-    updateThermoDisplay();
-    updatePressureDisplay();
+    updateThermoDisplay(thermocouples);
+    updatePressureDisplay(pressuretxers);
     cyclecounter = 0;
   }
 }
@@ -473,16 +491,21 @@ void drawSquealButton() {
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Pressure value ****
-void updatePressureDisplay() {
-  tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 0));
-  tft.fillRect(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 0), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
-  tft.print(pressureTxform(Pressure1), 1);
+void updatePressureDisplay(float* loc_pressures) {
+  tft.setTextColor(BLACK);
+  tft.setTextSize(HEADTEXT);
+  tft.fillRect(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 0), 8 * DATAWIDE, DATAHIGH * NUMPRESSURES, BACKCOLOR);
+  for (int j = 0; j < NUMPRESSURES; j++) {
+    tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * j));
+    tft.print(*(loc_pressures + j), 1);
+  }
 }
 
 // **** Fxn responsible for updating display with most recent/relevant GPS data ****
 void updateGPSDisplay(float latitude, char lat, float longitude, char lon) {
   tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 2));
   tft.setTextColor(BLACK);
+  tft.setTextSize(HEADTEXT);
   tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 2), 10 * DATAWIDE, 2 * DATAHIGH, BACKCOLOR);
   if (latitude >= 0) tft.print(" ");
     tft.print(latitude, 4);
@@ -496,20 +519,14 @@ void updateGPSDisplay(float latitude, char lat, float longitude, char lon) {
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Temperature values ****
-void updateThermoDisplay() {
+void updateThermoDisplay(float* loc_thermos) {
   tft.setTextColor(BLACK);
-  tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 8), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
-  tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 8));
-  tft.print(thermoTxform(Thermo1), 1);
-  tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 9), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
-  tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 9));
-  tft.print(thermoTxform(Thermo1), 1);
-  tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 10), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
-  tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 10));
-  tft.print(thermoTxform(Thermo1), 1);
-  tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 11), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
-  tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * 11));
-  tft.print(thermoTxform(Thermo1), 1);
+  tft.setTextSize(HEADTEXT);
+  for (int j = 0; j < NUMTHERMOS; j++) {
+    tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * (8 + j)), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
+    tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * (8 + j)));
+    tft.print(*(loc_thermos + j), 1);
+  }
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Pressure, Temperature, and GPS data ****
@@ -542,15 +559,10 @@ void writeHeaderText() {
   tft.setCursor(10, 8 + (8 * HEADTEXT * 6));
   tft.print("Thermocouples:");
 
-  tft.setCursor(10, 8 + (8 * HEADTEXT * 8));
-  tft.print("1:");
-  tft.setCursor(10, 8 + (8 * HEADTEXT * 9));
-  tft.print("2:");
-  tft.setCursor(10, 8 + (8 * HEADTEXT * 10));
-  tft.print("3:");
-  tft.setCursor(10, 8 + (8 * HEADTEXT * 11));
-  tft.print("4:");
-
+  for (int j = 0; j < NUMTHERMOS; j++) {
+    tft.setCursor(10, 8 + (8 * HEADTEXT * (8 + j)));
+    tft.print(j + 1); tft.print(":");
+  }
 }
 
 // Transforms analog reading of specified pin into temperature in degrees Fahrenheit
@@ -569,7 +581,7 @@ float pressureTxform(int pin) {
   float voltage = ((float)pinval * 5.0) / 1024.0;
   Serial.print("\nPinval at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(pinval);
   Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
-  float psi = ((-0.8 + voltage) * 1000.0) / 3.2;
+  float psi = ((voltage - MIN_P_VOLTAGE) * (MAX_P_PSI - MIN_P_PSI)) / (MAX_P_VOLTAGE - MIN_P_VOLTAGE);
   return psi;
 }
 
