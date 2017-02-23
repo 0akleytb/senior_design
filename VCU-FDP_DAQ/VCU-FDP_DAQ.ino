@@ -285,9 +285,9 @@ void loop() {
   
   /* Retrieve new temperature and pressure values once per cycle */
   thermocouples[0] = thermoTxform(Thermo1);
-  thermocouples[1] = thermoTxform(Thermo2);
-  thermocouples[2] = thermoTxform(Thermo3);
-  thermocouples[3] = thermoTxform(Thermo4);
+  thermocouples[1] = thermoTxform(Thermo1);
+  thermocouples[2] = thermoTxform(Thermo1);
+  thermocouples[3] = thermoTxform(Thermo1);
   pressuretxers[0] = pressureTxform(Pressure1);
   
   TSPoint p = ts.getPoint();
@@ -313,7 +313,8 @@ void loop() {
   /* open the file. note that only one file can be open at a time,
    *  so you have to close this one before opening another.
    */
-  
+
+  /*
   dataFile = SD.open(fileName, FILE_WRITE);
   dataFile.print(GPS.hour); dataFile.print(",");
   dataFile.print(GPS.minute);dataFile.print(",");
@@ -337,6 +338,7 @@ void loop() {
   dataFile.print((int)GPS.satellites);dataFile.print(",");
   dataFile.print("\n");
   dataFile.close();
+  */
 
   // **** Display Branch Loop Code ****
   
@@ -377,7 +379,7 @@ void loop() {
     isSqueal = false;
   }
 
-  if (cyclecounter < 256) cyclecounter++; else {
+  if (cyclecounter < 128) cyclecounter++; else {
     updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon);
     updateThermoDisplay(thermocouples);
     updatePressureDisplay(pressuretxers);
@@ -492,12 +494,23 @@ void drawSquealButton() {
 
 // **** Fxn responsible for updating display with most recent/relevant Pressure value ****
 void updatePressureDisplay(float* loc_pressures) {
+  int p;
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
   tft.fillRect(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 0), 8 * DATAWIDE, DATAHIGH * NUMPRESSURES, BACKCOLOR);
   for (int j = 0; j < NUMPRESSURES; j++) {
+    p = *(loc_pressures + j);
     tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * j));
-    tft.print(*(loc_pressures + j), 1);
+    
+    if (0.0 <= p)       // Text alignment before printing
+      tft.print(" ");
+    
+    if (p < -240.0)     // Assumes disconnected sensor (stabilizes around -250.0 @ 0V)
+      tft.print("D/C");
+    else if (p > (2 * MAX_P_PSI)) // Assumes either connection problem or sensor malfunction
+      tft.print("error");
+    else
+      tft.print(p, 1);
   }
 }
 
@@ -520,12 +533,20 @@ void updateGPSDisplay(float latitude, char lat, float longitude, char lon) {
 
 // **** Fxn responsible for updating display with most recent/relevant Temperature values ****
 void updateThermoDisplay(float* loc_thermos) {
+  int t;
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
   for (int j = 0; j < NUMTHERMOS; j++) {
-    tft.fillRect(10 + (DATAWIDE * 3), 8 + (DATAHIGH * (8 + j)), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
-    tft.setCursor(10 + (DATAWIDE * 3), 8 + (DATAHIGH * (8 + j)));
-    tft.print(*(loc_thermos + j), 1);
+    t = *(loc_thermos + j);
+    tft.fillRect(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (8 + j)), 7 * DATAWIDE, DATAHIGH, BACKCOLOR);
+    tft.setCursor(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (8 + j)));
+    
+    if (-100.0 < t && t < 100.0) // Text alignment before printing
+      tft.print(" ");
+    if (0.0 <= t)
+      tft.print(" ");
+    
+    tft.print(t, 1);
   }
 }
 
@@ -569,8 +590,8 @@ void writeHeaderText() {
 float thermoTxform(int pin) {
   int pinval = analogRead(pin);
   float voltage = ((float)pinval * 5.0) / 1024.0;
-  Serial.print("\nPinval at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(pinval);
-  Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
+  //Serial.print("\nPinval at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(pinval);
+  //Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
   float degC = (voltage - Vref) / 0.005;
   return ((degC * 9) / 5) + 32;
 }
@@ -579,8 +600,8 @@ float thermoTxform(int pin) {
 float pressureTxform(int pin) {
   int pinval = analogRead(pin);
   float voltage = ((float)pinval * 5.0) / 1024.0;
-  Serial.print("\nPinval at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(pinval);
-  Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
+  //Serial.print("\nPinval at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(pinval);
+  //Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
   float psi = ((voltage - MIN_P_VOLTAGE) * (MAX_P_PSI - MIN_P_PSI)) / (MAX_P_VOLTAGE - MIN_P_VOLTAGE);
   return psi;
 }
