@@ -50,6 +50,9 @@
 #define GPSSerial Serial1
 #define Dir "Datalogging"
 
+// DAQ Buffer Size
+#define BUFFER_SIZE 16
+
 /*******
  * Set GPSECHO to 'false' to turn off echoing the GPS data to the Serial console 
  * Set to 'true' if you want to debug and listen to the raw GPS sentences. 
@@ -102,6 +105,173 @@
 #define BACKCOLOR WHITE
 #define TESTCOLOR BLUE
 
+// Connect to the GPS on hardware serial
+Adafruit_GPS GPS(&GPSSerial);
+
+// Buffer structure containing GPS Data Members & Temperature Data Members
+typedef struct
+  {
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t seconds;
+    uint8_t year;
+    uint8_t month;
+    uint8_t day;
+    uint16_t milliseconds;
+    float lat;
+    float lon;
+    float spd;
+    float angle;
+    float alt;
+    float temp1;
+    float temp2;
+    float temp3;
+    float temp4;
+    float pressure;    
+  } Buff;
+
+// DAQ Buffer Class contains GPS Data, temperature & pressure readings 
+class DAQ_Buffer {
+  
+  private:
+  int count;
+  Buff daq_buff[BUFFER_SIZE];
+  File dataFile;
+  
+  
+    
+  public: 
+  DAQ_Buffer();
+  ~DAQ_Buffer();
+
+  boolean isFull(void);
+  void flush_buffer(void);
+  void write_buffer(String fileName);
+  void fill_buffer(float temp1, float temp2, float temp3, float temp4, float pressure);
+
+ 
+}; 
+
+DAQ_Buffer::DAQ_Buffer()
+{
+ this->count = 0; 
+ int i;
+ for(i = 0; i < BUFFER_SIZE; i++)
+      {
+        daq_buff[i].hour = 0;
+        daq_buff[i].minute = 0;
+        daq_buff[i].seconds = 0;
+        daq_buff[i].year = 0;
+        daq_buff[i].month = 0;
+        daq_buff[i].day = 0;
+        daq_buff[i].milliseconds = 0;
+        daq_buff[i].lat = 0;
+        daq_buff[i].lon = 0;
+        daq_buff[i].spd = 0;
+        daq_buff[i].alt = 0;
+        daq_buff[i].angle = 0;
+        daq_buff[i].temp1 = 0;
+        daq_buff[i].temp2 = 0;
+        daq_buff[i].temp3 = 0;
+        daq_buff[i].temp4 = 0;
+        daq_buff[i].pressure = 0;   
+        count = 0; 
+      } 
+      
+}
+
+DAQ_Buffer::~DAQ_Buffer()
+{
+}
+
+// Clear Buffer & Reset Count
+void DAQ_Buffer::flush_buffer(void)
+{ 
+      int i;
+      for(i = 0; i < BUFFER_SIZE; i++)
+      {
+        daq_buff[i].hour = 0;
+        daq_buff[i].minute = 0;
+        daq_buff[i].seconds = 0;
+        daq_buff[i].year = 0;
+        daq_buff[i].month = 0;
+        daq_buff[i].day = 0;
+        daq_buff[i].milliseconds = 0;
+        daq_buff[i].lat = 0;
+        daq_buff[i].lon = 0;
+        daq_buff[i].spd = 0;
+        daq_buff[i].alt = 0;
+        daq_buff[i].angle = 0;
+        daq_buff[i].temp1 = 0;
+        daq_buff[i].temp2 = 0;
+        daq_buff[i].temp3 = 0;
+        daq_buff[i].temp4 = 0;
+        daq_buff[i].pressure = 0;
+        count = 0; 
+      } 
+}
+
+// Write Buffer to microSD Card
+void DAQ_Buffer::write_buffer(String fileName)
+{
+  dataFile = SD.open(fileName, FILE_WRITE);
+  int i;
+    for(i = 0; i < BUFFER_SIZE; i++)
+    {
+      dataFile.print(daq_buff[i].hour); dataFile.print(",");
+      dataFile.print(daq_buff[i].minute);dataFile.print(",");
+      dataFile.print(daq_buff[i].seconds, DEC); dataFile.print(",");
+      dataFile.print(daq_buff[i].milliseconds);dataFile.print(",");
+      dataFile.print(daq_buff[i].day, DEC); dataFile.print(",");
+      dataFile.print(daq_buff[i].month, DEC); dataFile.print(",");
+      dataFile.print(daq_buff[i].year, DEC);dataFile.print(",");
+      dataFile.print(daq_buff[i].lat, 4);dataFile.print(",");
+      dataFile.print(daq_buff[i].lon, 4);dataFile.print(",");
+      dataFile.print(daq_buff[i].spd);dataFile.print(",");
+      dataFile.print(daq_buff[i].alt);dataFile.print(",");
+      dataFile.print(daq_buff[i].angle);dataFile.print(",");
+      dataFile.print(daq_buff[i].temp1);dataFile.print(",");
+      dataFile.print(daq_buff[i].temp2);dataFile.print(",");
+      dataFile.print(daq_buff[i].temp3);dataFile.print(",");
+      dataFile.print(daq_buff[i].temp4);dataFile.print(",");
+      dataFile.print(daq_buff[i].pressure);
+      dataFile.print("\n");    
+    }
+    dataFile.close(); 
+}
+
+//fill buffer with GPS data and temperature & pressure readings
+void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4, float pressure)
+{
+  daq_buff[count].hour = GPS.hour;
+  daq_buff[count].minute = GPS.minute;
+  daq_buff[count].seconds = GPS.seconds;
+  daq_buff[count].milliseconds = GPS.milliseconds;
+  daq_buff[count].day = GPS.day;
+  daq_buff[count].month = GPS.month;
+  daq_buff[count].year = GPS.year;
+  daq_buff[count].lat = GPS.latitudeDegrees;
+  daq_buff[count].lon = GPS.longitudeDegrees;
+  daq_buff[count].spd = GPS.speed;
+  daq_buff[count].alt = GPS.altitude;
+  daq_buff[count].angle = GPS.angle;
+  daq_buff[count].temp1 = temp1;
+  daq_buff[count].temp2 = temp2;
+  daq_buff[count].temp3 = temp3;
+  daq_buff[count].temp4 = temp4;
+  daq_buff[count].pressure = pressure;
+  count++;  
+}
+
+boolean DAQ_Buffer::isFull(void)
+{
+  if(count != BUFFER_SIZE)
+      return false;
+   else
+      return true;
+}
+
+
 
 
 
@@ -133,8 +303,7 @@ tsbutton startButton, squealButton;
 float thermocouples[NUMTHERMOS];
 float pressuretxers[NUMPRESSURES];
 
-// Connect to the GPS on hardware serial
-Adafruit_GPS GPS(&GPSSerial);
+
 
 /*******
  * this keeps track of whether we're using the interrupt
@@ -280,6 +449,7 @@ void setup() {
   drawButtons();
 }
 
+DAQ_Buffer daqBuffer;
 
 void loop() {
   
@@ -300,8 +470,19 @@ void loop() {
   if (GPS.newNMEAreceived())
   {
       if (!GPS.parse(GPS.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
-         ;// return;  // we can fail to parse a sentence in which case we should just wait for another
-      //stuff
+          return;  // we can fail to parse a sentence in which case we should just wait for another
+      else 
+     {
+        // if buffer is not full continue to fill, else write to microSD card & flush
+        if(!daqBuffer.isFull())
+            daqBuffer.fill_buffer(thermocouples[0],thermocouples[1],thermocouples[2],thermocouples[3], pressuretxers[0]);
+        else
+        {
+            daqBuffer.write_buffer(fileName);
+            daqBuffer.flush_buffer();
+            daqBuffer.fill_buffer(thermocouples[0],thermocouples[1],thermocouples[2],thermocouples[3], pressuretxers[0]);
+        }
+     } 
   }
 
   // if millis() or timer wraps around, we'll just reset it
