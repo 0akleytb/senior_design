@@ -42,7 +42,7 @@
 
 // Pressure Transmitter Circuit Pin(s)
 #define NUMPRESSURES 1
-#define Pressure1 12     // Changes to number of pin definitions may not have intended
+#define Pressure1 7     // Changes to number of pin definitions may not have intended
                          //   effect if NUMPRESSURES and in-the-loop transformations
                          //   (pressureTxform(...)) are not adjusted accordingly
 
@@ -87,7 +87,7 @@
 
 // LCD Element Sizes
 #define BOXSIZE 40
-#define BOXWIDE 160
+#define BOXWIDE 164
 #define BOXHIGH 120
 #define PENRADIUS 3
 #define DATAWIDE HEADTEXT*6 // width of a single character of header text
@@ -184,12 +184,21 @@ class tsbutton {
 // GLOBALS //
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, 258);
 Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
-int dummyval = 1234, cyclecounter = 0;
+int cyclecounter = 0, isDST = 0;
 bool logging = false, isSqueal = false, wasSqueal = false;
 tsbutton startButton, squealButton;
 float thermocouples[NUMTHERMOS];
 float pressuretxers[NUMPRESSURES];
 DAQ_Buffer daqBuffer;
+const int chipSelect = 53;        /* Pin number corresponding to Chip Select */
+String fileName = "datalog0.csv";
+const String dtlog = "datalog";
+const String ext = ".csv";
+int filecounter = 0;
+File dataFile;
+uint32_t timer = millis();
+
+
 
 
 
@@ -200,23 +209,14 @@ DAQ_Buffer daqBuffer;
 
 boolean usingInterrupt = false;
 
-/* Pin number corresponding to Chip Select */
-const int chipSelect = 53;
-String fileName = "datalog0.csv";
-const String dtlog = "datalog";
-const String ext = ".csv";
-int count = 0;
-File dataFile;
-uint32_t timer = millis();
-
-
 
 
 // PROTOTYPES //
 void useInterrupt(boolean v);
 float thermoTxform(int pin);
 float pressureTxform(int pin);
-
+int numDays(uint8_t month, uint8_t year);
+int determineDST(uint8_t hour, uint8_t day, uint8_t month, uint8_t year);
 
 
 
@@ -287,8 +287,8 @@ void setup() {
   while (SD.exists(fileName))
    {
        fileName = dtlog;
-       count += 1;
-       fileName += count;
+       filecounter += 1;
+       fileName += filecounter;
        fileName += ext; 
    }
 
@@ -309,7 +309,7 @@ void setup() {
     
     dataFile.print("Hour (Local),Minute,Second,Milliseconds,Day (@UTC),Month (@UTC),Year (@UTC),");
     dataFile.print("Latitude (Degrees),Longitude (Degrees),Speed (knots),Angle,Altitude,");
-    dataFile.print("Thermo 1 (°F),Thermo 2 (°F),Thermo 3 (°F),Thermo 4 (°F),Pressure (psi)\n");
+    dataFile.print("Thermo 1 (°F),Thermo 2 (°F),Thermo 3 (°F),Thermo 4 (°F),Pressure (psi),Squeal\n");
     dataFile.close();
 
   }
@@ -400,6 +400,13 @@ void loop() {
       if (p.y < BOXHIGH) { // **** start/stop button ****
         if (startButton.buttonPress(true) && startButton.wasJustPressed()) {
           logging = !logging;
+          if (logging) {   // we just started logging
+            daqBuffer.flush_buffer();
+            
+          } else {         // we just stopped logging
+            daqBuffer.write_buffer(fileName);
+            
+          }
           drawButtons();
           delay(250); // **** debounce start/stop button ****
         }
@@ -554,12 +561,23 @@ void updatePressureDisplay(float* loc_pressures) {
     if (0.0 <= p)       // Text alignment before printing
       tft.print(" ");
     
-    if (p < -240.0 || 2500 < p)     // Assumes disconnected sensor (stabilizes around -250.0 @ 0V)
+    if (p < -240.0)     // Assumes disconnected sensor (stabilizes around -250.0 @ 0V)
       tft.print("D/C");
     else if (p > (2 * MAX_P_PSI)) // Assumes either connection problem or sensor malfunction
       tft.print("error");
-    else
-      tft.print(p, 1);
+    else {
+      if ((-1000 < p) && (p < 1000)) {
+        tft.print(' ');
+        if ((-100 < p) && (p < 100)) {
+          tft.print(' ');
+          if ((-10 < p) && (p < 10)) {
+            tft.print(' ');
+          }
+        }
+      }
+      tft.print(p);
+      tft.print("psi");
+    }
   }
 }
 
@@ -582,7 +600,7 @@ void updateGPSDisplay(float latitude, char lat, float longitude, char lon) {
 
 // **** Fxn responsible for updating display with most recent/relevant Temperature values ****
 void updateThermoDisplay(float* loc_thermos) {
-  int t;
+  float t;
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
   for (int j = 0; j < NUMTHERMOS; j++) {
@@ -590,11 +608,19 @@ void updateThermoDisplay(float* loc_thermos) {
     tft.fillRect(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (8 + j)), 7 * DATAWIDE, DATAHIGH, BACKCOLOR);
     tft.setCursor(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (8 + j)));
     
-    if (-100.0 < t && t < 100.0) // Text alignment before printing
-      tft.print(" ");
     if (0.0 <= t)
-      tft.print(" ");
-    
+      tft.print(' ');
+
+    if ((-1000.0 < t) && (t < 1000.0)) {
+      tft.print(' ');
+      if ((-100.0 < t) && (t < 100.0)) {
+        tft.print(' ');
+        if ((-10.0 < t) && (t < 10.0)) {
+          tft.print(' ');
+        }
+      }
+    }
+        
     tft.print(t, 1);
   }
 }
@@ -619,6 +645,7 @@ void writeHeaderText() {
   tft.setCursor(10, 8 + (8 * HEADTEXT * 0)); // **** NOTE: a line's size is given by textsize*8 (per Adafruit_GFX library) ****
   tft.print("Pressure:");                    // **** >> use of HEADTEXT to determine where to draw text based on text size ****
 
+  //tft.setCursor
 
   tft.setCursor(10, 8 + (8 * HEADTEXT * 2));
   tft.print("Lat:");
@@ -631,7 +658,7 @@ void writeHeaderText() {
 
   for (int j = 0; j < NUMTHERMOS; j++) {
     tft.setCursor(10, 8 + (8 * HEADTEXT * (8 + j)));
-    tft.print(j + 1); tft.print(":");
+    tft.print(j + 1); tft.print(":       'F");
   }
 }
 
@@ -653,6 +680,102 @@ float pressureTxform(int pin) {
   //Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
   float psi = ((voltage - MIN_P_VOLTAGE) * (MAX_P_PSI - MIN_P_PSI)) / (MAX_P_VOLTAGE - MIN_P_VOLTAGE);
   return psi;
+}
+
+// Convert the reported month & year into the number of days in that month and year
+int numDays(uint8_t month, uint8_t year) {
+  int extraDays;
+  if (!(year % 4))  // if year%4 == 0, then it is a leap year; +1 extra day
+    extraDays = 1;
+  else
+    extraDays = 0;
+
+  switch (month) {
+    case  1:  return 31;
+              break;
+    case  2:  return 28 + extraDays;
+              break;
+    case  3:  return 31;
+              break;
+    case  4:  return 30;
+              break;
+    case  5:  return 31;
+              break;
+    case  6:  return 30;
+              break;
+    case  7:  return 31;
+              break;
+    case  8:  return 31;
+              break;
+    case  9:  return 30;
+              break;
+    case 10:  return 31;
+              break;
+    case 11:  return 30;
+              break;
+    case 12:  return 31;
+              break;
+    default:  return -1;  
+              break;
+  }
+
+  return -2;
+}
+
+//
+int determineDST(uint8_t hour, uint8_t day, uint8_t month, uint8_t year) {
+  
+  // using Saturday, 01 January 2000 as a starting point
+    // assuming year as a 2-digit value
+
+  int extraDays, countDays, DOTW;
+
+  extraDays = (((year - 00) + 3) / 4);  // extraDays is the # of days added by past leap years
+  
+  countDays = 365 * (year - 00);          // start with all days in past years since 2000
+  countDays += extraDays;                       // add leap days
+  for (uint8_t i = 1; i < 12; i++) {
+    if (i < month)
+      countDays += numDays(i, year);            // add the days in all past months this year (INCLUDING this year's leap day, if applicable)
+    else
+      break;
+  }
+  countDays += day;                             // finish by adding the past days of this month
+
+  DOTW = (countDays + 6) % 7;   // (Sunday = 0, Monday = 1, ..., Saturday = 6)
+  
+  /*
+  Serial.print("\nThe day of the week is ");
+  switch (DOTW) {
+    case  0:  Serial.print("Sunday!\n");
+              break;
+    case  1:  Serial.print("Monday!\n");
+              break;
+    case  2:  Serial.print("Tuesday!\n");
+              break;
+    case  3:  Serial.print("Wednesday!\n");
+              break;
+    case  4:  Serial.print("Thursday!\n");
+              break;
+    case  5:  Serial.print("Friday!\n");
+              break;
+    case  6:  Serial.print("Saturday!\n");
+              break;
+    
+  }
+  */
+  
+  if ((3 < month) && (month < 11)) {
+    return 1;
+  } else if ((month == 3) && (7 < (day - DOTW))) {
+    return 1;
+  } else if ((month == 11) && ((day - DOTW) < 1)) {
+    return 1;
+  } else {
+    return 0;
+  }
+
+  return 0;
 }
 
 
@@ -810,10 +933,45 @@ void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4,
   daq_buff[count].minute = GPS.minute;
   daq_buff[count].seconds = GPS.seconds;
   daq_buff[count].milliseconds = GPS.milliseconds;
-  daq_buff[count].day = GPS.day;
-  daq_buff[count].month = GPS.month;
-  daq_buff[count].year = GPS.year;
-  // POSSIBLE MODIFICATIONS TO BE MADE HERE FOR TIMEZONE & DAYLIGHT SAVINGS TIME 
+  if ((GPS.hour + TIMEZONE) < 0) {          // negative time-zones: not yet UTC day
+    if (GPS.day <= 1) {                       // not yet UTC month
+      if (GPS.month <= 1) {                     // not yet UTC year
+        daq_buff[count].year = GPS.year - 1;
+        daq_buff[count].month = 12;
+        daq_buff[count].day = 31;
+      } else {
+        daq_buff[count].year = GPS.year;
+        daq_buff[count].month = GPS.month - 1;
+        daq_buff[count].day = numDays(daq_buff[count].month, daq_buff[count].year);
+      }
+    } else {
+      daq_buff[count].year = GPS.year;
+      daq_buff[count].month = GPS.month;
+      daq_buff[count].day = GPS.day - 1;
+    }
+  } else if (24 <= (GPS.hour + TIMEZONE)) {       // positive time-zones: jump-start on UTC day
+    if (numDays(GPS.month, GPS.year) <= GPS.day) {  // jump-start on UTC month
+      if (12 <= GPS.month) {                          // jump-start on UTC year
+        daq_buff[count].year = GPS.year + 1;
+        daq_buff[count].month = 1;
+        daq_buff[count].day = 1;
+      } else {
+        daq_buff[count].year = GPS.year;
+        daq_buff[count].month = GPS.month + 1;
+        daq_buff[count].day = 1;
+      }
+    } else {
+      daq_buff[count].year = GPS.year;
+      daq_buff[count].month = GPS.month;
+      daq_buff[count].day = GPS.day + 1;
+    }
+    daq_buff[count].year = GPS.year;
+    daq_buff[count].month = GPS.month;
+    daq_buff[count].day = GPS.day;
+  }
+  //daq_buff[count].day = GPS.day;
+  //daq_buff[count].month = GPS.month;
+  //daq_buff[count].year = GPS.year;
   daq_buff[count].lat = GPS.latitudeDegrees;
   daq_buff[count].lon = GPS.longitudeDegrees;
   daq_buff[count].spd = GPS.speed;
