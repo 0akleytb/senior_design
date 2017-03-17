@@ -14,13 +14,14 @@
 
 
 var model = {
-    display_squeal: false,
+    include_on_hover: ["pressure","temperature","squeal"], //items to be shown on marker hover. Same names as in header line
+    include_in_dropdown: ["pressure","temperature","lat","lng"],//items to be shown in dropdown. Same names as in header line
     map: null,
     markers: [],
     squeal_color: "red",
     no_squeal_color: 'green',
-    data_order: null,
-    data_selected: null, //Possible values: One of the elements in data order
+    data_order: [], //array of strings containing header line info
+    data_selected: null, //Possible values: One of the elements in data order (string)
     // data_order: ["lat","lng","pressure","temperature","squeal"],
     data_array: [], //Will be filled with each data point, as an object.
     min_limit: 100,
@@ -30,7 +31,9 @@ var model = {
     gradient_direction: "to right",
     unit_map: { //Using object to map data types to their appropriate units.
         temperature: String.fromCharCode(176) + "F",
-        pressure: "PSI"
+        pressure: "PSI",
+        lat: String.fromCharCode(176),
+        lng: String.fromCharCode(176)
     },
     object_data_array: {//Each key will be a data type (temperature,pressure,etc). Each value will be an array containing the all of those values across all of the points
 
@@ -89,7 +92,7 @@ function readUI() {
 function newUpdateMap(){
     if(model.markers.length !== 0) {//If markers on map clear
         clearMarkers(model.markers);
-        model.markers = [];
+        model.markers = []; //better way to clear is: model.markers.length = 0;
     }
 
     addMarkerArray(model.data_array,model.map);
@@ -100,7 +103,7 @@ function readFilePopulateDropdown(callback){
 
     var UploadFileLocation = document.getElementById("files");
 
-    //TO DO: Check over here if correct type of file before instaintate file reader
+    //TO DO: Check over here if correct type of file before instaintate file reader. If not, output error and return
 
     // check if callback is callable
     if (typeof callback !== "function") {
@@ -194,12 +197,13 @@ function showFiles(e) {
 
 function ObjToString(object){
 
-    var string = "";
+    var string = "", value, unit;
 
     for(var key in object) {
-        if(object.hasOwnProperty(key)) {
-            var value = object[key];
-            string = string + "[" + key + "]" + ": " + value + "\n";
+        if(object.hasOwnProperty(key) && model.include_on_hover.includes(key)) {//If key should be shown on hover
+            value = object[key];
+            unit = model.unit_map[key] ? model.unit_map[key] : ""; //Find the unit via the object map. If doesn't exist empty string as unit
+            string = string + "[" + key + "]" + ": " + value + unit + " ";
         }
     }
 
@@ -303,7 +307,7 @@ function setMapOnAll(markers,map) {
 function create_object_array(data_order, data){
     var object_array = [];
 
-    for (var i = 0; i < data.length; i++) {//data.length is number of rows (data points)
+    for (var i = 0; i < data.length; i++) {//data.length is number of rows (data points)//data is a 2D array
         object_array.push({});
         for (var j = 0; j < data_order.length; j++) {//order.length is number of member properties.
             // object_array[i][order[j]] = next item in file //Use dynamic member accessor to create a property with correct key name
@@ -438,6 +442,7 @@ function getGradientColor(start_color, end_color, percent) {
 
 //http://www.plus2net.com/javascript_tutorial/list-adding.php
 function addOption(selectbox,text,value,index) {
+    console.log("created option");
     var optn = document.createElement("OPTION");
     optn.text = text.toUpperCase();
     optn.value = value;
@@ -454,17 +459,33 @@ function addOption(selectbox,text,value,index) {
  */
 function populateDropdown(info, id){
     var element = document.getElementById(id);
-    element.options = [];
+    // element.options = [];
+    element.options.length = 0; // clear options
     for(var i = 0, len = info.length; i < len; i++){
-        //Only add if not a squeal. Figure out a way to have this not hardcoded. Probably an array of items, in model, you dont want to include.
-        if (info[i] != "squeal") {//If info[i] is not found in dont_show array
-            addOption(element, info[i], info[i], i)
+        //If header, since data order will be passed as info, is in include in dropdown array show it.
+        if (model.include_in_dropdown.includes(info[i])) { //info[i] != "squeal" didnt create random blank options. But this does.
+            addOption(element, info[i], info[i], i);
         }
+    }
+
+    //Remove all blank options that get randomlny created for some reason. //Could also create a select element and add only filtered options and then replace the select tag
+    for(var i = 0; i < element.options.length; i++){
+        removeOptionsByValue(element, "");
     }
 
     //Manually fire an onchange event to updata data selected. Doesnt update by itself when adding an option
     var event = new Event('change');
     element.dispatchEvent(event);
+}
+
+function removeOptionsByValue (select, value) {
+    var options = select.options;
+    for (var i = 0; i < options.length; i++) {
+        if (options[i].value === value) {
+            select.removeChild(options[i]);
+        }
+    }
+    return null
 }
 
 function testButton(){
