@@ -154,7 +154,7 @@ class DAQ_Buffer {
 
   boolean isFull(void);
   void flush_buffer(void);
-  void write_buffer(String fileName);
+  void write_buffer(String locFileName);
   void fill_buffer(float temp1, float temp2, float temp3, float temp4, float pressure);
 
  
@@ -191,10 +191,9 @@ float thermocouples[NUMTHERMOS];
 float pressuretxers[NUMPRESSURES];
 DAQ_Buffer daqBuffer;
 const int chipSelect = 53;        /* Pin number corresponding to Chip Select */
-String fileName = "datalog0.csv";
-const String dtlog = "datalog";
+const String dtlog = "log";
 const String ext = ".csv";
-int filecounter = 0;
+String fileName = dtlog + '0' + ext;  //initial name of log file
 File dataFile;
 uint32_t timer = millis();
 
@@ -282,21 +281,26 @@ void setup() {
 //    SD.mkdir(Dir);
 //  }
 
-  
-    
-  while (SD.exists(fileName))
-   {
-       fileName = dtlog;
-       filecounter += 1;
-       fileName += filecounter;
-       fileName += ext; 
-   }
 
+  int filecounter = 0;
+  char filecounterstring[2];
+  while (SD.exists(fileName)) {
+    filecounter += 1;
+    if (filecounter > 99) {
+      Serial.print("\n[ERROR] cannot have more than 100 files!");
+      return;
+    }
+    fileName = dtlog + filecounter + ext;
+    /*
+    Serial.print("\nfilecounter = "); Serial.print(filecounter);
+    Serial.print("\nfileName = "); Serial.println(fileName);
+    //*/
+  }
 
   dataFile = SD.open(fileName, FILE_WRITE);
 
   if(dataFile){
-  Serial.println("datalog.csv opened successfully");}
+  Serial.print(fileName); Serial.println(" opened successfully");}
   else{
   Serial.println("error opening datalog.csv");}
  
@@ -332,7 +336,7 @@ void setup() {
 
   tft.fillScreen(BACKCOLOR);
   tft.setRotation(1);
-  writeHeaderText();
+  writeHeaderText(fileName);
   drawFrame();
   drawButtons();
 }
@@ -436,8 +440,8 @@ void loop() {
   }
 
   if (cyclecounter < 128) cyclecounter++; else {
-    updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon);
     updateThermoDisplay(thermocouples);
+    updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon, GPS.speed);
     updatePressureDisplay(pressuretxers);
     cyclecounter = 0;
   }
@@ -553,15 +557,15 @@ void updatePressureDisplay(float* loc_pressures) {
   int p;
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
-  tft.fillRect(10 + (DATAWIDE * 9), 8 + (DATAHIGH * 0), 8 * DATAWIDE, DATAHIGH * NUMPRESSURES, BACKCOLOR);
   for (int j = 0; j < NUMPRESSURES; j++) {
     p = *(loc_pressures + j);
-    tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * j));
+    tft.fillRect(10 + (DATAWIDE * 9), 8 + (DATAHIGH * (2 + j)), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
+    tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * (2 + j)));
     
     if (0.0 <= p)       // Text alignment before printing
       tft.print(" ");
     
-    if (p < -200.0)     // Assumes disconnected sensor (Arduino reads between -200.0 and -250.0psi @ 0V)
+    if (p < -150.0)     // Assumes disconnected sensor (Arduino reads between -200.0 and -250.0psi @ 0V)
       tft.print("D/C");
     else if (p > (2 * MAX_P_PSI)) // Assumes either connection problem or sensor malfunction
       tft.print("error");
@@ -582,20 +586,26 @@ void updatePressureDisplay(float* loc_pressures) {
 }
 
 // **** Fxn responsible for updating display with most recent/relevant GPS data ****
-void updateGPSDisplay(float latitude, char lat, float longitude, char lon) {
-  tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 2));
+void updateGPSDisplay(float latitude, char lat, float longitude, char lon, float speed) {
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
-  tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 2), 10 * DATAWIDE, 2 * DATAHIGH, BACKCOLOR);
+  tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 4), 10 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 4));
   if (latitude >= 0) tft.print(" ");
     tft.print(latitude, 4);
     tft.print(" ");
     tft.print(lat);
-  tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 3));
+  tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 5), 10 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 5));
   if (longitude >= 0) tft.print(" ");
     tft.print(longitude, 4);
     tft.print(" ");
     tft.print(lon);
+  tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 6), 10 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 6));
+  if (speed >= 0) tft.print(" ");
+    tft.print((speed * 1.151), 1);
+    tft.print(" mph");
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Temperature values ****
@@ -605,8 +615,8 @@ void updateThermoDisplay(float* loc_thermos) {
   tft.setTextSize(HEADTEXT);
   for (int j = 0; j < NUMTHERMOS; j++) {
     t = *(loc_thermos + j);
-    tft.fillRect(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (8 + j)), 7 * DATAWIDE, DATAHIGH, BACKCOLOR);
-    tft.setCursor(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (8 + j)));
+    tft.fillRect(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (9 + j)), 7 * DATAWIDE, DATAHIGH, BACKCOLOR);
+    tft.setCursor(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (9 + j)));
     
     if (0.0 <= t)
       tft.print(' ');
@@ -632,32 +642,40 @@ void updateDisplay() {
   tft.setTextSize(HEADTEXT);
 
   //updatePressureDisplay();
-  //updateGPSDisplay(0, 'c', 0, 'c');
+  //updateGPSDisplay(0, 'c', 0, 'c', 0);
   //updateThermoDisplay();
 
 }
 
 // **** Fxn responsible for writing headers (e.g. "Pressure:" and "Thermocouples:") to the display ****
-void writeHeaderText() {
+void writeHeaderText(String locFileName) {
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
 
-  tft.setCursor(10, 8 + (8 * HEADTEXT * 0)); // **** NOTE: a line's size is given by textsize*8 (per Adafruit_GFX library) ****
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 0));
+  tft.print("Open:");
+  tft.setTextColor(RED);
+  tft.print(locFileName);
+  tft.setTextColor(BLACK);
+
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 2)); // **** NOTE: a line's size is given by textsize*8 (per Adafruit_GFX library) ****
   tft.print("Pressure:");                    // **** >> use of HEADTEXT to determine where to draw text based on text size ****
 
   //tft.setCursor
 
-  tft.setCursor(10, 8 + (8 * HEADTEXT * 2));
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 4));
   tft.print("Lat:");
-  tft.setCursor(10, 8 + (8 * HEADTEXT * 3));
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 5));
   tft.print("Lon:");
-
-
   tft.setCursor(10, 8 + (8 * HEADTEXT * 6));
+  tft.print("Spd:");
+
+
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 8));
   tft.print("Thermocouples:");
 
   for (int j = 0; j < NUMTHERMOS; j++) {
-    tft.setCursor(10, 8 + (8 * HEADTEXT * (8 + j)));
+    tft.setCursor(10, 8 + (8 * HEADTEXT * (9 + j)));
     tft.print(j + 1); tft.print(":       'F");
   }
 }
@@ -902,9 +920,9 @@ void DAQ_Buffer::flush_buffer(void)
 }
 
 // Write Buffer to microSD Card
-void DAQ_Buffer::write_buffer(String fileName)
+void DAQ_Buffer::write_buffer(String locFileName)
 {
-  dataFile = SD.open(fileName, FILE_WRITE);
+  dataFile = SD.open(locFileName, FILE_WRITE);
   int i;
     for(i = 0; i < count; i++)
     {
@@ -980,7 +998,7 @@ void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4,
 
   daq_buff[count].lat = GPS.latitudeDegrees;
   daq_buff[count].lon = GPS.longitudeDegrees;
-  daq_buff[count].spd = GPS.speed;
+  daq_buff[count].spd = GPS.speed * 1.151;
   daq_buff[count].alt = GPS.altitude;
   daq_buff[count].angle = GPS.angle;
   daq_buff[count].temp1 = temp1;
