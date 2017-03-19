@@ -216,7 +216,7 @@ void useInterrupt(boolean v);
 float thermoTxform(int pin);
 float pressureTxform(int pin);
 int numDays(uint8_t month, uint8_t year);
-int determineDST(uint8_t hour, uint8_t day, uint8_t month, uint8_t year);
+int determineDST(uint8_t day, uint8_t month, uint8_t year);
 
 
 
@@ -307,9 +307,9 @@ void setup() {
     //dataFile.println("This is a test");
     //Serial.print("\n This part was not skipped");
     
-    dataFile.print("Hour (Local),Minute,Second,Milliseconds,Day (@UTC),Month (@UTC),Year (@UTC),");
-    dataFile.print("Latitude (Degrees),Longitude (Degrees),Speed (knots),Angle,Altitude,");
-    dataFile.print("Thermo 1 (°F),Thermo 2 (°F),Thermo 3 (°F),Thermo 4 (°F),Pressure (psi),Squeal\n");
+    dataFile.print("Hour,Minute,Second,Milliseconds,Day,Month,Year,");
+    dataFile.print("Latitude,Longitude,Speed,Angle,Altitude,");
+    dataFile.print("Thermo1,Thermo2,Thermo3,Thermo4,Pressure,Squeal");
     dataFile.close();
 
   }
@@ -387,7 +387,7 @@ void loop() {
   if (timer > millis())  timer = millis();
   
   /* Approximately every 2 seconds or so, print out the current stats */
-  PrintToConsole();
+  //PrintToConsole();
   
   // **** Display Branch Loop Code ****
   
@@ -405,7 +405,7 @@ void loop() {
             
           } else {         // we just stopped logging
             daqBuffer.write_buffer(fileName);
-            
+            daqBuffer.flush_buffer();
           }
           drawButtons();
           delay(250); // **** debounce start/stop button ****
@@ -561,7 +561,7 @@ void updatePressureDisplay(float* loc_pressures) {
     if (0.0 <= p)       // Text alignment before printing
       tft.print(" ");
     
-    if (p < -240.0)     // Assumes disconnected sensor (stabilizes around -250.0 @ 0V)
+    if (p < -200.0)     // Assumes disconnected sensor (Arduino reads between -200.0 and -250.0psi @ 0V)
       tft.print("D/C");
     else if (p > (2 * MAX_P_PSI)) // Assumes either connection problem or sensor malfunction
       tft.print("error");
@@ -723,7 +723,7 @@ int numDays(uint8_t month, uint8_t year) {
 }
 
 //
-int determineDST(uint8_t hour, uint8_t day, uint8_t month, uint8_t year) {
+int determineDST(uint8_t day, uint8_t month, uint8_t year) {
   
   // using Saturday, 01 January 2000 as a starting point
     // assuming year as a 2-digit value
@@ -740,7 +740,9 @@ int determineDST(uint8_t hour, uint8_t day, uint8_t month, uint8_t year) {
     else
       break;
   }
-  countDays += day;                             // finish by adding the past days of this month
+  countDays += (day - 1);                             // finish by adding the past days of this month
+
+  //Serial.print("\nIt has been %d days since Jan 1 2000.", countDays);
 
   DOTW = (countDays + 6) % 7;   // (Sunday = 0, Monday = 1, ..., Saturday = 6)
   
@@ -766,12 +768,16 @@ int determineDST(uint8_t hour, uint8_t day, uint8_t month, uint8_t year) {
   */
   
   if ((3 < month) && (month < 11)) {
+    //Serial.print("It IS daylight savings time!\n");
     return 1;
   } else if ((month == 3) && (7 < (day - DOTW))) {
+    //Serial.print("It IS daylight savings time!\n");
     return 1;
   } else if ((month == 11) && ((day - DOTW) < 1)) {
+    //Serial.print("It IS daylight savings time!\n");
     return 1;
   } else {
+    //Serial.print("It is NOT daylight savings time!\n");
     return 0;
   }
 
@@ -900,8 +906,9 @@ void DAQ_Buffer::write_buffer(String fileName)
 {
   dataFile = SD.open(fileName, FILE_WRITE);
   int i;
-    for(i = 0; i < BUFFER_SIZE; i++)
+    for(i = 0; i < count; i++)
     {
+      dataFile.print("\n");
       dataFile.print(daq_buff[i].hour);          dataFile.print(",");
       dataFile.print(daq_buff[i].minute);        dataFile.print(",");
       dataFile.print(daq_buff[i].seconds, DEC);  dataFile.print(",");
@@ -921,7 +928,6 @@ void DAQ_Buffer::write_buffer(String fileName)
       dataFile.print(daq_buff[i].pressure);      dataFile.print(",");
       dataFile.print(daq_buff[i].squeal);        dataFile.print(",");
       //dataFile.print(i);                         dataFile.print(",");
-      dataFile.print("\n");
     }
     dataFile.close(); 
 }
@@ -965,13 +971,13 @@ void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4,
       daq_buff[count].month = GPS.month;
       daq_buff[count].day = GPS.day + 1;
     }
+  } else {  // 0 <= (GPS.hour + TIMEZONE) < 24 ...we're in normal bounds
     daq_buff[count].year = GPS.year;
     daq_buff[count].month = GPS.month;
     daq_buff[count].day = GPS.day;
   }
-  //daq_buff[count].day = GPS.day;
-  //daq_buff[count].month = GPS.month;
-  //daq_buff[count].year = GPS.year;
+  daq_buff[count].hour += determineDST(daq_buff[count].day, daq_buff[count].month, daq_buff[count].year); //maybe use UTC to determine, then move up to hour calculation
+
   daq_buff[count].lat = GPS.latitudeDegrees;
   daq_buff[count].lon = GPS.longitudeDegrees;
   daq_buff[count].spd = GPS.speed;
