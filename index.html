@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>MAP</title>
+        <meta name="viewport" content="initial-scale=1.0">
+        <meta charset="utf-8">
+        <!-- Latest compiled and minified CSS -->
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+        <!-- Optional theme -->
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+
+        <!-- Custom styles to override/modify default bootstrap styles -->
+        <link rel="stylesheet" type="text/css" href="custom.css">
+
+        <!-- Latest compiled and minified JavaScript -->
+        <!-- <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script> -->
+
+    </head>
+<body>
+
+
+<div class="container" id="app">
+
+    <!--<div class = "row" id = "data_location" > Data Shown Here On Hover </div>-->
+
+
+    <!--DATA TABLE IMPLEMENTATION-->
+    <div class = "row" id = "data_table_row" >
+        <table id = "example_table" class="table table-bordered data_table">
+            <thead>
+            <tr>
+                <!--<th>Header1</th>-->
+                <!--<th>Header2</th>-->
+                <!--<th>Header3</th>-->
+                <!--<th>Header4</th>-->
+                <!--<th>Header5</th>-->
+                <!--<th>Header6</th>-->
+                <!--<th>Header7</th>-->
+
+                <td>Header1</td>
+                <td>Header2</td>
+                <td>Header3</td>
+                <td>Header4</td>
+                <td>Header5</td>
+                <td>Header6</td>
+                <td>Header7</td>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>Data1</td>
+                <td>Data2</td>
+                <td>Data3</td>
+                <td>Data4</td>
+                <td>Data5</td>
+                <td>Data6</td>
+                <td>Data7</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <!--END DATA TABLE IMPLEMENTATION-->
+
+
+
+    <!--MAP AND UI ROW-->
+    <div class= "row row-eq-height" id = "map-row">
+        <!--MAP COLUMN-->
+        <div id = "map" class="col-md-9"></div>
+        <!--END MAP COLUMN-->
+
+        <!--UI COlUMN-->
+        <div id = "user-interface" class="col-md-3">
+            <h1 id = "app-title">Maps Application</h1>
+            <p>[Instructions]: Google maps application for FDP brakes. Upload one data file containing data logged. Data file must be a csv or txt file. Different data points must be separated by a new line and various data information at each point must be delimited by a comma. After upload, choose the data to visualize and the min, max colors appropriately. Hover over markers to view data.</p>
+            <div id = "input_field">
+                <input type="file" id="files" name="files[]" single />
+            </div>
+
+            <br>
+            <!--<output id="list"><p id="temp_text">[Uploaded files will show up here]</p></output>-->
+
+            <!--DATA SELECTION-->
+            <div id = "data-selection">
+                <p id = "data-selection-title">Choose Data to Display: </p>
+
+                <select class="form-control" id="dropdown">
+                    <!--<option>1</option>-->
+                    <!--<option>2</option>-->
+                    <!--<option>3</option>-->
+                    <!--<option>4</option>-->
+                </select>
+
+                <div class = "row">
+                    <div class = "col-md-6">
+                        <p style="text-align: center; font-weight: 600; padding-top: 10px;">Min</p>
+                        <span>Limit: </span><input id="min_limit" type="text" class = "half-width"><span class="units">*</span>
+                        <span>Color </span><input id="min_color" type="text" class = "half-width">
+                    </div>
+
+                    <div class = "col-md-6">
+                        <p style="text-align: center; font-weight: 600; padding-top: 10px;">Max</p>
+                        <span>Limit: </span><input id="max_limit" type="text" class = "half-width"><span class="units">*</span>
+                        <span>Color </span><input id="max_color" type="text" class = "half-width">
+                    </div>
+                </div>
+            </div>
+            <!--END DATA SELECTION-->
+            <br>
+            <!--COLOR BAR-->
+            <div class="row" id="color-previewer">
+                <div class = "col-md-3">Gradient:</div>
+                <div class = "col-md-9" id="color-bar">
+                    <!--<p style="text-align: left;">234</p>-->
+                    <!--<p style="text-align: right;">759</p>-->
+                </div>
+
+            </div>
+
+            <!--<span>Gradient:</span><div id = "color-bar" style="margin-top: 10px;"></div>-->
+            <!--END COLOR BAR-->
+
+
+            <button type="button" class="btn btn-info hide" id = "test_button">TEST</button>
+
+            <div class = "bottom">
+                <button type="button" class="btn btn-primary full-width" id = "run_button">RUN!</button>
+            </div>
+
+        </div>
+        <!--END UI COLUMN-->
+    </div>
+    <!--END MAP AND UI ROW-->
+</div>
+
+</body>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCnPYpLcSaAzLuMVcto2yEed67wgm-7PVM"></script>
+<script src = "map.js"></script>
+
+</html>
+
+
+<!--AIzaSyCnPYpLcSaAzLuMVcto2yEed67wgm-7PVM>
