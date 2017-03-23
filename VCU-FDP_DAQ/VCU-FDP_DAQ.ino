@@ -195,6 +195,9 @@ const String dtlog = "log";
 const String ext = ".csv";
 String fileName = dtlog + '0' + ext;  //initial name of log file
 File dataFile;
+bool enableHeader = false;
+
+bool newfile = true;
 uint32_t timer = millis();
 
 
@@ -233,7 +236,59 @@ SIGNAL(TIMER0_COMPA_vect) {
 }
 
 
+//Create new file and enable header write to file
+void file_create(void)
+{
+  if(enableHeader)
+  {
+      int filecounter = 0;
 
+      Serial.print("Initializing SD card...");
+
+    
+    
+   
+       while (SD.exists(fileName)) 
+      {
+        filecounter += 1;
+        if (filecounter > 99) {
+        Serial.print("\n[ERROR] cannot have more than 100 files!");
+        return;
+      }
+      fileName = dtlog + filecounter + ext;
+      
+      Serial.print("\nfilecounter = "); Serial.print(filecounter);
+      Serial.print("\nfileName = "); Serial.println(fileName);
+      
+      }
+
+  
+  
+      dataFile = SD.open(fileName, FILE_WRITE);
+
+      if(dataFile){
+        Serial.print(fileName); Serial.println(" opened successfully");}
+      else{
+        Serial.println("error opening datalog.csv");}
+ 
+
+     /*if the file is available, write to it: */
+      if (dataFile) 
+      {
+        //dataFile.println("This is a test");
+        //Serial.print("\n This part was not skipped");
+    
+       dataFile.print("Hour,Minute,Second,Milliseconds,Day,Month,Year,");
+       dataFile.print("Latitude,Longitude,Speed,Angle,Altitude,");
+       dataFile.print("Thermo1,Thermo2,Thermo3,Thermo4,Pressure,Squeal");
+       dataFile.close();
+      
+
+      }
+      enableHeader = false;
+    }
+    
+}
 
 // **** **** **** **** //
 //                     //
@@ -264,16 +319,28 @@ void setup() {
   /* Request updates on antenna status, comment out to keep quiet */
   GPS.sendCommand(PGCMD_ANTENNA);
 
-  Serial.print("Initializing SD card...");
-
+  
   /* check if the card is present and can be initialized: */
-  if (!SD.begin(chipSelect))
+/*  if (!SD.begin(chipSelect))
   {
     Serial.println("Card failed, or not present");
    // don't do anything more:
     return;
-  }
+  }*/
+
+     if (!SD.begin(chipSelect))
+      {
+         Serial.println("Card failed, or not present");
+         //tft.print(Card failed, or not present);
+        // don't do anything more:
+         return;
+     }
+
+     
   Serial.println("card initialized.");
+
+
+  
 
 //  // If no Directory, one will be created
 //  if(!SD.exists(Dir))
@@ -282,31 +349,21 @@ void setup() {
 //  }
 
 
-  int filecounter = 0;
+  
   char filecounterstring[2];
-  while (SD.exists(fileName)) {
-    filecounter += 1;
-    if (filecounter > 99) {
-      Serial.print("\n[ERROR] cannot have more than 100 files!");
-      return;
-    }
-    fileName = dtlog + filecounter + ext;
-    /*
-    Serial.print("\nfilecounter = "); Serial.print(filecounter);
-    Serial.print("\nfileName = "); Serial.println(fileName);
-    //*/
-  }
 
-  dataFile = SD.open(fileName, FILE_WRITE);
+  
+  
+ /* dataFile = SD.open(fileName, FILE_WRITE);
 
   if(dataFile){
   Serial.print(fileName); Serial.println(" opened successfully");}
   else{
   Serial.println("error opening datalog.csv");}
  
-
+`*/
   /*if the file is available, write to it: */
-  if (dataFile) 
+ /* if (dataFile) 
   {
     //dataFile.println("This is a test");
     //Serial.print("\n This part was not skipped");
@@ -316,7 +373,7 @@ void setup() {
     dataFile.print("Thermo1,Thermo2,Thermo3,Thermo4,Pressure,Squeal");
     dataFile.close();
 
-  }
+  }*/
   /********
    * Set timer0 interrupt to go off every 1 millisecond and read data from GPS
    ********/
@@ -376,6 +433,7 @@ void loop() {
     else
     {
       // if buffer is not full continue to fill, else write to microSD card & flush
+     
       if(!daqBuffer.isFull())
           daqBuffer.fill_buffer(thermocouples[0],thermocouples[1],thermocouples[2],thermocouples[3], pressuretxers[0]);
       else
@@ -404,6 +462,14 @@ void loop() {
       if (p.y < BOXHIGH) { // **** start/stop button ****
         if (startButton.buttonPress(true) && startButton.wasJustPressed()) {
           logging = !logging;
+          if (logging == true)
+          {
+            enableHeader = true;
+            file_create();
+           
+            
+          }
+         
           if (logging) {   // we just started logging
             daqBuffer.flush_buffer();
             
@@ -655,6 +721,7 @@ void writeHeaderText(String locFileName) {
   tft.setCursor(10, 8 + (8 * HEADTEXT * 0));
   tft.print("Open:");
   tft.setTextColor(RED);
+ 
   tft.print(locFileName);
   tft.setTextColor(BLACK);
 
