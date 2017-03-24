@@ -52,6 +52,9 @@
 #define MIN_P_PSI 0.0
 #define MAX_P_PSI 1000.0
 
+// Extra Sensor Parameters
+#define DEFAULT_RUNAVG_BUFFSIZE 8       // probably best to be a power of 2, for ease of division
+
 // Hardware Serialport
 #define GPSSerial Serial1
 #define Dir "Datalogging"
@@ -179,6 +182,21 @@ class tsbutton {
 };
 
 
+// Class Definition for an object that keeps a running average of values passed to it (for time-averaging sensors)
+class runningAVG {
+  private:
+    float* current;
+    float* avgbuffer;
+    float avg;
+    int buffersize;
+
+  public:
+    runningAVG();
+    runningAVG(int);
+    ~runningAVG();
+    float insertval(float);
+    float getAVG();
+};
 
 
 // GLOBALS //
@@ -187,8 +205,8 @@ Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 int cyclecounter = 0, isDST = 0;
 bool logging = false, isSqueal = false, wasSqueal = false;
 tsbutton startButton, squealButton;
-float thermocouples[NUMTHERMOS];
-float pressuretxers[NUMPRESSURES];
+runningAVG avgdThermocouples[NUMTHERMOS];
+runningAVG avgdPressuretxers[NUMPRESSURES];
 DAQ_Buffer daqBuffer;
 const int chipSelect = 53;        /* Pin number corresponding to Chip Select */
 const String dtlog = "log";
@@ -196,8 +214,6 @@ const String ext = ".csv";
 String fileName = dtlog + '0' + ext;  //initial name of log file
 File dataFile;
 bool enableHeader = false;
-
-bool newfile = true;
 uint32_t timer = millis();
 
 
@@ -236,59 +252,7 @@ SIGNAL(TIMER0_COMPA_vect) {
 }
 
 
-//Create new file and enable header write to file
-void file_create(void)
-{
-  if(enableHeader)
-  {
-      int filecounter = 0;
 
-      Serial.print("Initializing SD card...");
-
-    
-    
-   
-       while (SD.exists(fileName)) 
-      {
-        filecounter += 1;
-        if (filecounter > 99) {
-        Serial.print("\n[ERROR] cannot have more than 100 files!");
-        return;
-      }
-      fileName = dtlog + filecounter + ext;
-      
-      Serial.print("\nfilecounter = "); Serial.print(filecounter);
-      Serial.print("\nfileName = "); Serial.println(fileName);
-      
-      }
-
-  
-  
-      dataFile = SD.open(fileName, FILE_WRITE);
-
-      if(dataFile){
-        Serial.print(fileName); Serial.println(" opened successfully");}
-      else{
-        Serial.println("error opening datalog.csv");}
- 
-
-     /*if the file is available, write to it: */
-      if (dataFile) 
-      {
-        //dataFile.println("This is a test");
-        //Serial.print("\n This part was not skipped");
-    
-       dataFile.print("Hour,Minute,Second,Milliseconds,Day,Month,Year,");
-       dataFile.print("Latitude,Longitude,Speed,Angle,Altitude,");
-       dataFile.print("Thermo1,Thermo2,Thermo3,Thermo4,Pressure,Squeal");
-       dataFile.close();
-      
-
-      }
-      enableHeader = false;
-    }
-    
-}
 
 // **** **** **** **** //
 //                     //
@@ -319,28 +283,14 @@ void setup() {
   /* Request updates on antenna status, comment out to keep quiet */
   GPS.sendCommand(PGCMD_ANTENNA);
 
-  
   /* check if the card is present and can be initialized: */
-/*  if (!SD.begin(chipSelect))
+  if (!SD.begin(chipSelect))
   {
     Serial.println("Card failed, or not present");
    // don't do anything more:
     return;
-  }*/
-
-     if (!SD.begin(chipSelect))
-      {
-         Serial.println("Card failed, or not present");
-         //tft.print(Card failed, or not present);
-        // don't do anything more:
-         return;
-     }
-
-     
+  }
   Serial.println("card initialized.");
-
-
-  
 
 //  // If no Directory, one will be created
 //  if(!SD.exists(Dir))
@@ -349,31 +299,6 @@ void setup() {
 //  }
 
 
-  
-  char filecounterstring[2];
-
-  
-  
- /* dataFile = SD.open(fileName, FILE_WRITE);
-
-  if(dataFile){
-  Serial.print(fileName); Serial.println(" opened successfully");}
-  else{
-  Serial.println("error opening datalog.csv");}
- 
-`*/
-  /*if the file is available, write to it: */
- /* if (dataFile) 
-  {
-    //dataFile.println("This is a test");
-    //Serial.print("\n This part was not skipped");
-    
-    dataFile.print("Hour,Minute,Second,Milliseconds,Day,Month,Year,");
-    dataFile.print("Latitude,Longitude,Speed,Angle,Altitude,");
-    dataFile.print("Thermo1,Thermo2,Thermo3,Thermo4,Pressure,Squeal");
-    dataFile.close();
-
-  }*/
   /********
    * Set timer0 interrupt to go off every 1 millisecond and read data from GPS
    ********/
@@ -400,12 +325,17 @@ void setup() {
 
 void loop() {
   
-  /* Retrieve new temperature and pressure values once per cycle */
-  thermocouples[0] = thermoTxform(Thermo1);
-  thermocouples[1] = thermoTxform(Thermo1);
-  thermocouples[2] = thermoTxform(Thermo1);
-  thermocouples[3] = thermoTxform(Thermo1);
-  pressuretxers[0] = pressureTxform(Pressure1);
+  /* Retrieve new temperature and pressure values once per cycle and store to be averaged */
+  avgdThermocouples[0].insertval(thermoTxform(Thermo1));
+  //Serial.print("thermo buffer 0! The average is "); Serial.println(avgdThermocouples[0].getAVG());
+  avgdThermocouples[1].insertval(thermoTxform(Thermo1));
+  //Serial.print("thermo buffer 1! The average is "); Serial.println(avgdThermocouples[1].getAVG());
+  avgdThermocouples[2].insertval(thermoTxform(Thermo1));
+  //Serial.print("thermo buffer 2! The average is "); Serial.println(avgdThermocouples[2].getAVG());
+  avgdThermocouples[3].insertval(thermoTxform(Thermo1));
+  //Serial.print("thermo buffer 3! The average is "); Serial.println(avgdThermocouples[3].getAVG());
+  avgdPressuretxers[0].insertval(pressureTxform(Pressure1));
+  //Serial.print("pressure buffer 0! The average is "); Serial.println(avgdPressuretxers[0].getAVG());
 
   uint8_t last_GPS_sec = GPS.seconds;
   uint16_t last_GPS_msec = GPS.milliseconds;
@@ -433,14 +363,13 @@ void loop() {
     else
     {
       // if buffer is not full continue to fill, else write to microSD card & flush
-     
       if(!daqBuffer.isFull())
-          daqBuffer.fill_buffer(thermocouples[0],thermocouples[1],thermocouples[2],thermocouples[3], pressuretxers[0]);
+          daqBuffer.fill_buffer(avgdThermocouples[0].getAVG(), avgdThermocouples[1].getAVG(), avgdThermocouples[2].getAVG(), avgdThermocouples[3].getAVG(), avgdPressuretxers[0].getAVG());
       else
       {
           daqBuffer.write_buffer(fileName);
           daqBuffer.flush_buffer();
-          daqBuffer.fill_buffer(thermocouples[0],thermocouples[1],thermocouples[2],thermocouples[3], pressuretxers[0]);
+          daqBuffer.fill_buffer(avgdThermocouples[0].getAVG(), avgdThermocouples[1].getAVG(), avgdThermocouples[2].getAVG(), avgdThermocouples[3].getAVG(), avgdPressuretxers[0].getAVG());
       }
     }
   }
@@ -462,15 +391,9 @@ void loop() {
       if (p.y < BOXHIGH) { // **** start/stop button ****
         if (startButton.buttonPress(true) && startButton.wasJustPressed()) {
           logging = !logging;
-          if (logging == true)
-          {
+          if (logging) {   // we just started logging
             enableHeader = true;
             file_create();
-           
-            
-          }
-         
-          if (logging) {   // we just started logging
             daqBuffer.flush_buffer();
             
           } else {         // we just stopped logging
@@ -506,9 +429,9 @@ void loop() {
   }
 
   if (cyclecounter < 128) cyclecounter++; else {
-    updateThermoDisplay(thermocouples);
+    updateThermoDisplay(avgdThermocouples);
     updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon, GPS.speed);
-    updatePressureDisplay(pressuretxers);
+    updatePressureDisplay(avgdPressuretxers);
     cyclecounter = 0;
   }
 }
@@ -520,6 +443,53 @@ void loop() {
 //   UNCLASSED  FXNS   //
 //                     //
 // **** **** **** **** //
+
+
+// Create new file and enable header write to file
+void file_create(void)
+{
+  if(enableHeader)
+  {
+    int filecounter = 0;
+
+    Serial.print("Initializing SD card...");
+
+    while (SD.exists(fileName)) 
+    {
+      filecounter += 1;
+      if (filecounter > 99) {
+        Serial.print("\n[ERROR] cannot have more than 100 files!");
+        return;
+      }
+      fileName = dtlog + filecounter + ext;
+      
+      Serial.print("\nfilecounter = "); Serial.print(filecounter);
+      Serial.print("\nfileName = "); Serial.println(fileName);
+      
+    }
+
+    dataFile = SD.open(fileName, FILE_WRITE);
+
+    if(dataFile){
+      Serial.print(fileName); Serial.println(" opened successfully");}
+    else{
+      Serial.println("error opening datalog.csv");}
+    
+    /*if the file is available, write to it: */
+    if (dataFile) 
+    {
+      //dataFile.println("This is a test");
+      //Serial.print("\n This part was not skipped");
+      dataFile.print("Hour,Minute,Second,Milliseconds,Day,Month,Year,");
+      dataFile.print("Latitude,Longitude,Speed,Angle,Altitude,");
+      dataFile.print("Thermo1,Thermo2,Thermo3,Thermo4,Pressure,Squeal");
+      dataFile.close();
+    }
+    enableHeader = false;
+  }
+    
+}
+
 
 /* Print GPS Data to Serial Console every 2 seconds */
 void PrintToConsole()
@@ -619,12 +589,12 @@ void drawSquealButton() {
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Pressure value ****
-void updatePressureDisplay(float* loc_pressures) {
+void updatePressureDisplay(runningAVG* loc_pressures) {
   int p;
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
   for (int j = 0; j < NUMPRESSURES; j++) {
-    p = *(loc_pressures + j);
+    p = (*(loc_pressures + j)).getAVG();
     tft.fillRect(10 + (DATAWIDE * 9), 8 + (DATAHIGH * (2 + j)), 8 * DATAWIDE, DATAHIGH, BACKCOLOR);
     tft.setCursor(10 + (DATAWIDE * 9), 8 + (DATAHIGH * (2 + j)));
     
@@ -655,16 +625,16 @@ void updatePressureDisplay(float* loc_pressures) {
 void updateGPSDisplay(float latitude, char lat, float longitude, char lon, float speed) {
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
-  tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 4), 10 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 4), 11 * DATAWIDE, DATAHIGH, BACKCOLOR);
   tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 4));
   if (latitude >= 0) tft.print(" ");
-    tft.print(latitude, 4);
+    tft.print(latitude, 5);
     tft.print(" ");
     tft.print(lat);
-  tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 5), 10 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 5), 11 * DATAWIDE, DATAHIGH, BACKCOLOR);
   tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 5));
   if (longitude >= 0) tft.print(" ");
-    tft.print(longitude, 4);
+    tft.print(longitude, 5);
     tft.print(" ");
     tft.print(lon);
   tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 6), 10 * DATAWIDE, DATAHIGH, BACKCOLOR);
@@ -675,12 +645,12 @@ void updateGPSDisplay(float latitude, char lat, float longitude, char lon, float
 }
 
 // **** Fxn responsible for updating display with most recent/relevant Temperature values ****
-void updateThermoDisplay(float* loc_thermos) {
+void updateThermoDisplay(runningAVG* loc_thermos) {
   float t;
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
   for (int j = 0; j < NUMTHERMOS; j++) {
-    t = *(loc_thermos + j);
+    t = (*(loc_thermos + j)).getAVG();
     tft.fillRect(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (9 + j)), 7 * DATAWIDE, DATAHIGH, BACKCOLOR);
     tft.setCursor(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (9 + j)));
     
@@ -721,7 +691,6 @@ void writeHeaderText(String locFileName) {
   tft.setCursor(10, 8 + (8 * HEADTEXT * 0));
   tft.print("Open:");
   tft.setTextColor(RED);
- 
   tft.print(locFileName);
   tft.setTextColor(BLACK);
 
@@ -761,8 +730,10 @@ float thermoTxform(int pin) {
 float pressureTxform(int pin) {
   int pinval = analogRead(pin);
   float voltage = ((float)pinval * 5.0) / 1024.0;
-  //Serial.print("\nPinval at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(pinval);
-  //Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
+  /*
+  Serial.print("\nPinval at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(pinval);
+  Serial.print("Interpreted Voltage at pin "); Serial.print(pin); Serial.print(" is "); Serial.println(voltage);
+  //*/
   float psi = ((voltage - MIN_P_VOLTAGE) * (MAX_P_PSI - MIN_P_PSI)) / (MAX_P_VOLTAGE - MIN_P_VOLTAGE);
   return psi;
 }
@@ -1001,8 +972,8 @@ void DAQ_Buffer::write_buffer(String locFileName)
       dataFile.print(daq_buff[i].day, DEC);      dataFile.print(",");
       dataFile.print(daq_buff[i].month, DEC);    dataFile.print(",");
       dataFile.print(daq_buff[i].year, DEC);     dataFile.print(",");
-      dataFile.print(daq_buff[i].lat, 4);        dataFile.print(",");
-      dataFile.print(daq_buff[i].lon, 4);        dataFile.print(",");
+      dataFile.print(daq_buff[i].lat, 5);        dataFile.print(",");
+      dataFile.print(daq_buff[i].lon, 5);        dataFile.print(",");
       dataFile.print(daq_buff[i].spd);           dataFile.print(",");
       dataFile.print(daq_buff[i].alt);           dataFile.print(",");
       dataFile.print(daq_buff[i].angle);         dataFile.print(",");
@@ -1085,4 +1056,53 @@ boolean DAQ_Buffer::isFull(void)
       return true;
 }
 
+runningAVG::runningAVG() {
+  buffersize = DEFAULT_RUNAVG_BUFFSIZE;
+  avgbuffer = new float[buffersize];
+  current = avgbuffer;
+  for (int i = 0; i < buffersize; i++) {
+    avgbuffer[i] = 0.0;
+  }
+  avg = 0.0;
+}
+
+runningAVG::runningAVG(int buffer_size) {
+  if (buffer_size < 1)
+    buffer_size = DEFAULT_RUNAVG_BUFFSIZE;
+  else
+    buffersize = buffer_size;
+  avgbuffer = new float[buffersize];
+  current = avgbuffer;
+  for (int i = 0; i < buffersize; i++) {
+    avgbuffer[i] = 0.0;
+  }
+  avg = 0.0;
+}
+
+runningAVG::~runningAVG() {
+  
+}
+
+float runningAVG::insertval(float new_val) {
+  *current = new_val;
+  //Serial.print("\nInserted "); Serial.print(*current); Serial.print(" into ");
+  current = (((current - avgbuffer) + 1) % buffersize) + avgbuffer;
+  //return getAVG();
+  return 0.0;
+}
+
+float runningAVG::getAVG() {
+  avg = 0.0;
+  //Serial.print("\n\tDefaulted sum to "); Serial.print(avg);
+  for (int i = 0; i < buffersize; i++) {
+    avg += avgbuffer[i];
+    //Serial.print("\n\tAdded "); Serial.print(avgbuffer[i]); Serial.print(" to sum");
+  }
+  avg = avg/buffersize;
+  /*
+  Serial.print("\n\tCalculated internal average as "); Serial.print(avg);
+  Serial.print("\nReturned average is ");
+  //*/
+  return avg;
+}
 
