@@ -4,17 +4,14 @@
         <title>MAP</title>
         <meta name="viewport" content="initial-scale=1.0">
         <meta charset="utf-8">
-        <!-- Latest compiled and minified CSS -->
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
-        <!-- Optional theme -->
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
-
-        <!-- Custom styles to override/modify default bootstrap styles -->
+        <!--BOOTSTRAP CSS AND CUSTOM STYLES-->
+        <link rel="stylesheet" type="text/css" href="lib/bootstrap.min.css">
+        <link rel="stylesheet" type="text/css" href="lib/bootstrap-theme.min.css">
         <link rel="stylesheet" type="text/css" href="custom.css">
 
-        <!-- Latest compiled and minified JavaScript -->
-        <!-- <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script> -->
+        <script src="lib/jquery.min.js"></script>
+        <script src="lib/bootstrap.min.js"></script>
 
     </head>
 <body>
@@ -22,22 +19,11 @@
 
 <div class="container" id="app">
 
-    <!--<div class = "row" id = "data_location" > Data Shown Here On Hover </div>-->
-
-
     <!--DATA TABLE IMPLEMENTATION-->
     <div class = "row" id = "data_table_row" >
         <table id = "example_table" class="table table-bordered data_table">
             <thead>
             <tr>
-                <!--<th>Header1</th>-->
-                <!--<th>Header2</th>-->
-                <!--<th>Header3</th>-->
-                <!--<th>Header4</th>-->
-                <!--<th>Header5</th>-->
-                <!--<th>Header6</th>-->
-                <!--<th>Header7</th>-->
-
                 <td>Header1</td>
                 <td>Header2</td>
                 <td>Header3</td>
@@ -63,7 +49,6 @@
     <!--END DATA TABLE IMPLEMENTATION-->
 
 
-
     <!--MAP AND UI ROW-->
     <div class= "row row-eq-height" id = "map-row">
         <!--MAP COLUMN-->
@@ -79,17 +64,13 @@
             </div>
 
             <br>
-            <!--<output id="list"><p id="temp_text">[Uploaded files will show up here]</p></output>-->
 
             <!--DATA SELECTION-->
             <div id = "data-selection">
                 <p id = "data-selection-title">Choose Data to Display: </p>
 
                 <select class="form-control" id="dropdown">
-                    <!--<option>1</option>-->
-                    <!--<option>2</option>-->
-                    <!--<option>3</option>-->
-                    <!--<option>4</option>-->
+
                 </select>
 
                 <div class = "row">
@@ -111,35 +92,61 @@
             <!--COLOR BAR-->
             <div class="row" id="color-previewer">
                 <div class = "col-md-3">Gradient:</div>
-                <div class = "col-md-9" id="color-bar">
-                    <!--<p style="text-align: left;">234</p>-->
-                    <!--<p style="text-align: right;">759</p>-->
-                </div>
+                <div class = "col-md-9" id="color-bar"></div>
 
             </div>
 
-            <!--<span>Gradient:</span><div id = "color-bar" style="margin-top: 10px;"></div>-->
             <!--END COLOR BAR-->
 
 
-            <button type="button" class="btn btn-info hide" id = "test_button">TEST</button>
-
             <div class = "bottom">
-                <button type="button" class="btn btn-primary full-width" id = "run_button">RUN!</button>
+                <button type="button" class="btn btn-primary full-width hide" id = "generate_graph_button">GENERATE GRAPH</button>
             </div>
-
+            
+            <!--LOGO-->
+            <div class="bottom" id="logo">
+                <img src="images/logo.jpg" alt="Friction Science">
+            </div>
+    <!--END LOGO-->
         </div>
         <!--END UI COLUMN-->
     </div>
+
     <!--END MAP AND UI ROW-->
+
+
+    <!--GRAPH MODAL-->
+    <div class="modal fade" id="graph_modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" data-backdrop="static" data-keyboard="false">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <!-- <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button> -->
+                    <h4 class="modal-title" id="question_modal_title">GRAPH</h4>
+                </div>
+                <div class="modal-body"> <!--*INLINE LEFT ALIGNMENT*/-->
+
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+    <!--END GRAPH MODAL-->
 </div>
 
 </body>
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCnPYpLcSaAzLuMVcto2yEed67wgm-7PVM"></script>
+
+    <!--PROGRAM LOGIC-->
+<!--<script src = "js/model.js"></script>-->
+<!--<script src = "js/utils.js"></script>-->
+<!--<script src = "js/map_functions.js"></script>-->
+<!--<script src = "js/init.js"></script>-->
+
 <script src = "map.js"></script>
 
 </html>
 
 
-<!--AIzaSyCnPYpLcSaAzLuMVcto2yEed67wgm-7PVM>

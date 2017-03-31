@@ -6,14 +6,8 @@
 //Consider using info windows on lat/lng + kml overlay
 
 
-//TO DO: Add squeals as beach flags. Markers with icons. Place a member property that will be checked in gradient function so that squeals/markers will be ignored
-
-//IMPROVEMENT: Remove run button and just simulate a keypress (if its not too hard) onchange of the filed field (works fine because the needed data for the RUN button has defualt values.)
-//TO DO: Fix adding options so that old option array that is longer than new options still shows old options greater than its length
-//TO DO: Consider making addmarker and addmarkerarray void functions that directly mutate the model map. So that using it as a callback is smoother
-
 var model = {
-    include_on_hover: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4","Squeal", "Speed", "Latitude", "Longitude", "Hour", "Minute", "Second", "Milliseconds"], //items to be shown on marker hover. Same names as in header line
+    include_on_hover: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4","Squeal", "Speed", "Latitude", "Longitude", "Second", "Milliseconds"], //items to be shown on marker hover. Same names as in header line
     include_in_dropdown: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4", "Speed"],//items to be shown in dropdown. Same names as in header line
     map: null,
     markers: [],
@@ -25,8 +19,8 @@ var model = {
     data_array: [], //Will be filled with each data point, as an object.
     min_limit: 100,
     max_limit: 1000,
-    min_color: "#ff0000",
-    max_color: "#0000ff",
+    min_color: "white",
+    max_color: "red",
     gradient_direction: "to right",
     unit_map: { //Using object to map data types to their appropriate units.
         Thermo1: String.fromCharCode(176) + "F",
@@ -36,17 +30,13 @@ var model = {
         Pressure: "PSI",
         Latitude: String.fromCharCode(176),
         Longitude: String.fromCharCode(176),
-        Speed: "Kn"
+        Speed: "MPH"
     },
     object_data_array: {//Each key will be a data type (temperature,pressure,etc). Each value will be an array containing the all of those values across all of the points
 
     }
 }
 
-//Consider making a views object that holds all the references to each of the UI elements. ie. squeal_button: document.getElementById("squeal_button");
-var views = {
-
-}
 
 function init(){ //Create function
     model.map = new google.maps.Map(document.getElementById('map'), {
@@ -54,10 +44,6 @@ function init(){ //Create function
       zoom: 17
     });
 
-    //Test or old event listeners
-    document.getElementById("test_button").addEventListener("click", testButton)
-    // document.getElementById("go_button").addEventListener("click", updateMap)
-    // document.getElementById("clear_button").addEventListener("click", clearMap)
 
     //Add event listeners
     document.getElementById("files").addEventListener("change", readFilePopulateDropdown)       //listener for fileuploadlocation. Changing file would
@@ -66,10 +52,7 @@ function init(){ //Create function
     document.getElementById("max_color").addEventListener("change", setMaxColor)
     document.getElementById("min_limit").addEventListener("change", setMinLimit)
     document.getElementById("max_limit").addEventListener("change", setMaxLimit)
-    document.getElementById("run_button").addEventListener("click", newUpdateMap);
-    // document.getElementById('files').addEventListener('change', showFiles, false);
-    // document.getElementById("squeal_button").addEventListener("click", updateMap) //Squeal switch. Instead maybe have the layers that they wanted.
-    // document.getElementById("files").addEventListener("change", readFile)       //listener for fileuploadlocation. Changing file would
+    document.getElementById("generate_graph_button").addEventListener("click", showGraph)
 
     // Check for the various File API support.
     if (window.File && window.FileReader && window.FileList && window.Blob) {
@@ -96,23 +79,14 @@ function afterReadFile(){
     //Create data table
     createDataTable();
 
-    //Send a click event on RUN, testing right now
-
-    var clickEvent = new MouseEvent("click", {
-        "view": window,
-        "bubbles": true,
-        "cancelable": false
-    });
-
-    document.getElementById("run_button").dispatchEvent(clickEvent);
+    //Update The Map by adding markers
+    newUpdateMap();
 
 }
 
-function readUI() {
-  //READ CONTENTS FROM THE UI. Read value of UI
-
+function showGraph(){
+    $("graph_modal").modal('show');
 }
-
 
 function newUpdateMap(){
     if(model.markers.length !== 0) {//If markers on map clear
@@ -171,31 +145,6 @@ function readFilePopulateDropdown(callback){
     reader.readAsText(UploadFileLocation.files[0]);
 }
 
-function clearMap() {
-
-    model.data_array = [];
-    clearMarkers(model.markers);
-    model.markers = [];
-    //Swap out input field to clear it. Consider storing the innerHTML into a variable and simply restoring it afterward
-    document.getElementById("input_field").innerHTML = '<input type="file" id="files" name="files[]" single />';
-
-    //Re add event listener to file field since replaced input fields
-    // document.getElementById('files').addEventListener('change', showFiles, false);
-}
-
-function showFiles(e) {
-    var files = e.target.files; // FileList object
-
-    // files is a FileList of File objects. List some properties.
-    var output = [];
-    for (var i = 0, f; f = files[i]; i++) {
-        output.push('<li><strong>', escape(f.name), '</strong> (', f.type || 'n/a', ') - ',
-            f.size, ' bytes, last modified: ',
-            f.lastModifiedDate ? f.lastModifiedDate.toLocaleDateString() : 'n/a',
-            '</li>');
-    }
-    document.getElementById('list').innerHTML = '<ul>' + output.join('') + '</ul>';
-}
 
 function ObjToString(object){
 
@@ -377,13 +326,6 @@ function create_object_array(data_order, data){
     return object_array;
 }
 
-function setColor(e){
-    model.min_color = e.target.value || "#fff";
-    model.max_color = e.target.value || "#000";
-    var gradient = document.getElementById("color-bar");
-    gradient.style.background = 'linear-gradient('+ model.gradient_direction + ', ' + model.min_color + ', ' + model.max_color+ ')';
-
-}
 
 function setMinColor(e){
     model.min_color = e.target.value;
@@ -539,6 +481,10 @@ function populateDropdown(info, id){
 
 function createDataTable(){
 
+    //If the example table has already been removed, do not create a new one. Exit
+    if(!document.getElementById("example_table")){
+        return;
+    }
     // // var table = document.getElementById("data_table");
     // //var table = document.createElement("table");
     //
@@ -610,14 +556,6 @@ function removeOptionsByValue (select, value) {
         }
     }
     return null
-}
-
-function testButton(){
-    console.log("Clicked Test button");
-    for (var i = 0; i < 50; i++){
-        // model.markers[i].setFillColor("#fff");
-        model.markers[i].setOptions({fillColor: "#fff"})
-    }
 }
 
 function updateMarkersGradient(data){

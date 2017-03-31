@@ -1,54 +1,18 @@
-/* Always set the map height explicitly to define the size of the div
- * element that contains the map. */
+/*STYLES
+ *GENERAL
+ *DATA TABLE
+ *COLOR-BAR/GRADIENT
+ *MAP STYLES
+ *MISC
+*/
+
+/* Always set the map height explicitly to define the size of the div* element that contains the map. */
+
+
+/********************************************GENERAL STYLES**************************************/
 
 .hide {
     display: none;
-}
-
-.units{
-    font-size: 12px;
-    overflow: auto;
-    /*width: 30%;*/
-}
-
-#app-title{
-    font-size: 26px;
-    padding-top: 20px;
-    margin: 0px 0px 10px 0px;
-}
-#map{
-    height: 100%; /* 100% of parent hieght (row height)*/
-    /*height: 500px;*/
-}
-
-#data_location{
-    font-size: 18px;
-    /*line-height: 400%;*/
-    font-family: "Helvetica Neue";
-    /*text-transform: uppercase;*/
-}
-
-.data_table{
-    font-size: 16px;
-    font-family: "Helvetica Neue";
-    text-align: center;
-    margin-bottom: 0px;
-}
-
-.data_table thead td{
-    font-weight: bold;
-}
-
-#map-row {
-    height: 85VH; /* Row and therefore Map takes 90% of view height*/
-        /*height: 100%!important;*/
-    /*overflow: hidden;*/
-    /*background-color: aqua;*/
-
-}
-
-.btn {
-	border-radius: 0px;
 }
 
 .full-width{
@@ -56,36 +20,13 @@
 }
 
 .half-width{
-  width: 49%!important;
+    width: 49%!important;
 }
 
 .quarter-width{
     width: 24%!important;
 }
 
-/*#temp_text {*/
-    /*font-size: 12px;*/
-    /*font-style: italic;*/
-/*}*/
-
-#data-selection-title{
-    font-size: 16px;
-    font-weight: 500;
-}
-
-#color-previewer{
-    margin-top: 10px!important;
-    /*width: 110%;*/
-}
-
-#color-bar{
-    background: linear-gradient(to right, #ff0000 , #0000ff);
-    height: 20px;
-}
-
-form input{
-    width: 20%;
-}
 
 .bottom {
     position: absolute;
@@ -102,4 +43,83 @@ form input{
     display: -webkit-flex;
     display: -ms-flexbox;
     display: flex;
+}
+/********************************************END GENERAL STYLES**************************************/
+
+/********************************************DATA TABLE STYLES**************************************/
+.data_table{
+    font-size: 16px;
+    font-family: "Helvetica Neue";
+    text-align: center;
+    margin-bottom: 0px;
+    table-layout: fixed;
+}
+
+.data_table thead td{
+    font-weight: bold;
+}
+/********************************************END DATA TABLE STYLES**********************************/
+
+/********************************************COLOR BAR STYLES**********************************/
+#color-previewer{
+    margin-top: 10px!important;
+    /*width: 110%;*/
+}
+
+#color-bar{
+    background: linear-gradient(to right, white , red);
+    height: 20px;
+}
+/********************************************END COLOR BAR STYLES**********************************/
+
+/********************************************MAP STYLES*******************************************/
+#map{
+    height: 100%; /* 100% of parent hieght (row height)*/
+    /*height: 500px;*/
+}
+
+
+#map-row {
+    height: 85VH; /* Row and therefore Map takes 90% of view height*/
+    /*height: 100%!important;*/
+    /*overflow: hidden;*/
+    /*background-color: aqua;*/
+
+}
+/**----------------------------------END MAP STYLES----------------------------------------**/
+
+
+/**----------------------------------MISC STYLES----------------------------------------**/
+
+.units{
+    font-size: 11px;
+    overflow: auto;
+    letter-spacing: -1px;
+}
+
+#app-title{
+    font-size: 26px;
+    padding-top: 20px;
+    margin: 0px 0px 10px 0px;
+}
+
+.btn {
+	border-radius: 0px;
+}
+
+#data-selection-title{
+    font-size: 16px;
+    font-weight: 500;
+}
+
+form input{
+    width: 20%;
+}
+
+#logo{
+    /*margin: 0 auto;*/
+    display: block!important;
+    margin: 0 auto!important;
+    width:100%;
+
 }
