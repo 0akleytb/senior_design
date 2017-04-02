@@ -29,6 +29,7 @@
    DI 51
    DO 50
    CK 52 */
+#define SD_CD 49
 
 // Thermocouple Amp-out Pins
 #define NUMTHERMOS 4     // Best to not exceed 4 thermos.
@@ -53,7 +54,7 @@
 #define MAX_P_PSI 1000.0
 
 // Extra Sensor Parameters
-#define DEFAULT_RUNAVG_BUFFSIZE 8       // probably best to be a power of 2, for ease of division
+#define DEFAULT_RUNAVG_BUFFSIZE 32       // probably best to be a power of 2, for ease of division
 
 // Hardware Serialport
 #define GPSSerial Serial1
@@ -86,7 +87,9 @@
 #define TFTHEIGHT  320
 
 // LCD Text Sizes
+#define BIGTEXT 4
 #define HEADTEXT 3          // text-size to be used for headers & display data
+#define SMALLTEXT 2
 
 // LCD Element Sizes
 #define BOXSIZE 40
@@ -194,8 +197,36 @@ class runningAVG {
     runningAVG();
     runningAVG(int);
     ~runningAVG();
-    float insertval(float);
+    void insertval(float);
     float getAVG();
+};
+
+
+//
+class timeAdjuster {
+  private:
+    bool isinstantiated;
+    uint8_t isfresh;
+    int8_t timezone;
+    int8_t hour;
+    int8_t day;
+    int8_t month;
+    int16_t year;
+
+  public:
+    timeAdjuster();
+    timeAdjuster(Adafruit_GPS* p_GPS);
+    timeAdjuster(const timeAdjuster& that);
+    ~timeAdjuster();
+    
+    uint8_t refresh(Adafruit_GPS* p_GPS);
+    void setTimezone(int8_t newtimezone);
+    int8_t getHour();
+    int8_t getDay();
+    int8_t getMonth();
+    int16_t getYear();
+    
+    void operator=(const timeAdjuster& that);
 };
 
 
@@ -235,7 +266,7 @@ float thermoTxform(int pin);
 float pressureTxform(int pin);
 int numDays(uint8_t month, uint8_t year);
 int determineDST(uint8_t day, uint8_t month, uint8_t year);
-
+void dateTime(uint16_t* dtdate, uint16_t* dttime);
 
 
 /*  Interrupt Handler for Timer Interrupt vector "TIMER0_COMPA_vect"
@@ -261,6 +292,21 @@ SIGNAL(TIMER0_COMPA_vect) {
 // **** **** **** **** //
 
 void setup() {
+  // **** Display Branch Set-up Code ****
+  tft.reset();
+  uint16_t identifier = tft.readID();
+
+  if ((identifier == 0x9325) || (identifier == 0x9328) || (identifier == 0x7575) || (identifier == 0x9341) || (identifier == 0x8357))
+    tft.begin(identifier);
+  else
+    return;
+
+  tft.fillScreen(BACKCOLOR);
+  tft.setRotation(1);
+  writeHeaderText();
+  updateFileName();
+  drawFrame();
+  drawButtons();
 
   // **** Main Branch Set-up Code ****
   /* Set Serial Baud Rate to 115200 for GPS reads, com[uter & Arduino connection */
@@ -283,12 +329,17 @@ void setup() {
   /* Request updates on antenna status, comment out to keep quiet */
   GPS.sendCommand(PGCMD_ANTENNA);
 
+  /* set the callback function when opening a file to be dateTime */
+  SdFile::dateTimeCallback(dateTime);
+
   /* check if the card is present and can be initialized: */
-  if (!SD.begin(chipSelect))
+  while (!SD.begin(chipSelect))
   {
     Serial.println("Card failed, or not present");
-   // don't do anything more:
-    return;
+    // don't do anything more:
+    // return;
+    updateStatusDisplay();
+    delay(1000);
   }
   Serial.println("card initialized.");
 
@@ -305,38 +356,18 @@ void setup() {
   useInterrupt(true);
 
   delay(1000);
-
-
-  // **** Display Branch Set-up Code ****
-  tft.reset();
-  uint16_t identifier = tft.readID();
-
-  if ((identifier == 0x9325) || (identifier == 0x9328) || (identifier == 0x7575) || (identifier == 0x9341) || (identifier == 0x8357))
-    tft.begin(identifier);
-  else
-    return;
-
-  tft.fillScreen(BACKCOLOR);
-  tft.setRotation(1);
-  writeHeaderText(fileName);
-  drawFrame();
-  drawButtons();
 }
+
 
 void loop() {
   
   /* Retrieve new temperature and pressure values once per cycle and store to be averaged */
   avgdThermocouples[0].insertval(thermoTxform(Thermo1));
-  //Serial.print("thermo buffer 0! The average is "); Serial.println(avgdThermocouples[0].getAVG());
-  avgdThermocouples[1].insertval(thermoTxform(Thermo1));
-  //Serial.print("thermo buffer 1! The average is "); Serial.println(avgdThermocouples[1].getAVG());
-  avgdThermocouples[2].insertval(thermoTxform(Thermo1));
-  //Serial.print("thermo buffer 2! The average is "); Serial.println(avgdThermocouples[2].getAVG());
-  avgdThermocouples[3].insertval(thermoTxform(Thermo1));
-  //Serial.print("thermo buffer 3! The average is "); Serial.println(avgdThermocouples[3].getAVG());
+  avgdThermocouples[1].insertval(thermoTxform(Thermo2));
+  avgdThermocouples[2].insertval(thermoTxform(Thermo3));
+  avgdThermocouples[3].insertval(thermoTxform(Thermo4));
   avgdPressuretxers[0].insertval(pressureTxform(Pressure1));
-  //Serial.print("pressure buffer 0! The average is "); Serial.println(avgdPressuretxers[0].getAVG());
-
+  
   uint8_t last_GPS_sec = GPS.seconds;
   uint16_t last_GPS_msec = GPS.milliseconds;
   
@@ -395,10 +426,10 @@ void loop() {
             enableHeader = true;
             file_create();
             daqBuffer.flush_buffer();
-            
+            updateFileName(fileName);
           } else {         // we just stopped logging
             daqBuffer.write_buffer(fileName);
-            daqBuffer.flush_buffer();
+            updateFileName();
           }
           drawButtons();
           delay(250); // **** debounce start/stop button ****
@@ -428,9 +459,10 @@ void loop() {
     isSqueal = false;
   }
 
-  if (cyclecounter < 128) cyclecounter++; else {
+  if (cyclecounter < 256) cyclecounter++; else {
     updateThermoDisplay(avgdThermocouples);
-    updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon, GPS.speed);
+    updateStatusDisplay();
+    //updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon, GPS.speed);
     updatePressureDisplay(avgdPressuretxers);
     cyclecounter = 0;
   }
@@ -444,6 +476,20 @@ void loop() {
 //                     //
 // **** **** **** **** //
 
+
+//* call back for file timestamps
+void dateTime(uint16_t* dtdate, uint16_t* dttime) {
+ //DateTime now = RTC.now();
+ timeAdjuster myTime(&GPS);
+
+ // return date using FAT_DATE macro to format fields
+ //*date = FAT_DATE(now.year(), now.month(), now.day());
+ *dtdate = FAT_DATE(myTime.getYear(), myTime.getMonth(), myTime.getDay());
+
+ // return time using FAT_TIME macro to format fields
+ //*time = FAT_TIME(now.hour(), now.minute(), now.second());
+ *dttime = FAT_TIME(myTime.getHour(), GPS.minute, GPS.seconds);
+} //*/
 
 // Create new file and enable header write to file
 void file_create(void)
@@ -489,7 +535,6 @@ void file_create(void)
   }
     
 }
-
 
 /* Print GPS Data to Serial Console every 2 seconds */
 void PrintToConsole()
@@ -547,7 +592,7 @@ void useInterrupt(boolean v) {
 void drawButtons() {
 
   // Drawing Start/Stop button
-  tft.setTextSize(4);
+  tft.setTextSize(BIGTEXT);
   tft.setCursor(TFTWIDTH - BOXWIDE + 20, 40);
   if (logging) {
     tft.fillRect(TFTWIDTH - BOXWIDE, 0, BOXWIDE, BOXHIGH, RED);
@@ -644,6 +689,63 @@ void updateGPSDisplay(float latitude, char lat, float longitude, char lon, float
     tft.print(" mph");
 }
 
+// **** Fxn responsible for reporting system status messages to the display ****
+void updateStatusDisplay() {
+  bool GPS_fix = GPS.fix;
+  bool SD_inserted = (digitalRead(SD_CD) == HIGH);
+  
+  tft.setTextSize(HEADTEXT);
+  tft.fillRect(10 + (DATAWIDE * 8), 8 + (DATAHIGH * 4), 7 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 8), 8 + (DATAHIGH * 4));
+  if (GPS_fix && SD_inserted) {
+    tft.setTextColor(GREEN);
+    tft.print("Good!");
+    tft.fillRect(10 + (DATAWIDE * 0), 8 + (DATAHIGH * 6), 15 * DATAWIDE, DATAHIGH, BACKCOLOR);
+    updateTimeDateDisplay();
+  } else if (!SD_inserted) {
+    tft.setTextColor(RED);
+    tft.print("No SD!");
+    tft.fillRect(10 + (DATAWIDE * 0), 8 + (DATAHIGH * 5), 15 * DATAWIDE, DATAHIGH, BACKCOLOR);
+    tft.setCursor(10 + (DATAWIDE * 1), 8 + (DATAHIGH * 5));
+    tft.print("Please insert"); //ayyyy
+    tft.fillRect(10 + (DATAWIDE * 0), 8 + (DATAHIGH * 6), 15 * DATAWIDE, DATAHIGH, BACKCOLOR);
+    tft.setCursor(10 + (DATAWIDE * 1), 8 + (DATAHIGH * 6));
+    tft.print("SD card.");
+  } else if (!GPS_fix) {
+    tft.setTextColor(RED);
+    tft.print("No Fix!");
+    tft.fillRect(10 + (DATAWIDE * 0), 8 + (DATAHIGH * 5), 15 * DATAWIDE, DATAHIGH, BACKCOLOR);
+    tft.setCursor(10 + (DATAWIDE * 1), 8 + (DATAHIGH * 5));
+    tft.print("Please wait");
+    tft.fillRect(10 + (DATAWIDE * 0), 8 + (DATAHIGH * 6), 15 * DATAWIDE, DATAHIGH, BACKCOLOR);
+    tft.setCursor(10 + (DATAWIDE * 1), 8 + (DATAHIGH * 6));
+    tft.print("for GPS fix.");
+  } else {
+    tft.setTextColor(RED);
+    tft.print("Bad");
+  }
+  /*
+  tft.fillRect(10 + (DATAWIDE * 0), 8 + (DATAHIGH * 5), 15 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 1), 8 + (DATAHIGH * 5));
+  tft.fillRect(10 + (DATAWIDE * 0), 8 + (DATAHIGH * 6), 15 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 1), 8 + (DATAHIGH * 6));
+  //*/
+}
+
+// **** Fxn responsible for updating display with GPS-reported time & date ****
+void updateTimeDateDisplay() {
+  timeAdjuster myTime(&GPS);
+
+  tft.setTextColor(BLACK);
+  tft.setTextSize(SMALLTEXT);
+  tft.fillRect(10 + (DATAWIDE * 0), 8 + (DATAHIGH * 5), 15 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 0), 8 + (DATAHIGH * 5) + 2);
+  tft.print(myTime.getHour()); tft.print(":");
+  if(GPS.minute < 10) tft.print("0");
+  tft.print(GPS.minute); tft.print(", ");
+  tft.print(myTime.getMonth()); tft.print("/"); tft.print(myTime.getDay()); tft.print("/"); tft.print(myTime.getYear());
+}
+
 // **** Fxn responsible for updating display with most recent/relevant Temperature values ****
 void updateThermoDisplay(runningAVG* loc_thermos) {
   float t;
@@ -666,8 +768,12 @@ void updateThermoDisplay(runningAVG* loc_thermos) {
         }
       }
     }
-        
-    tft.print(t, 1);
+    if ((int)(t * 10) == 13802) {
+      tft.print("D/C");
+    } else {
+      tft.print(t, 1);
+      tft.print("'F");
+    }
   }
 }
 
@@ -683,36 +789,53 @@ void updateDisplay() {
 
 }
 
+// **** Fxns responsible for updating display with current file being written ****
+void updateFileName(String locFileName) {
+  tft.setTextColor(RED);
+  tft.setTextSize(HEADTEXT);  
+  tft.fillRect(10 + (DATAWIDE * 5), 8 + (DATAHIGH * 0), 12 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 5), 8 + (DATAHIGH * 0));
+  tft.print(locFileName);
+}
+void updateFileName() {
+  tft.setTextColor(GRAY);
+  tft.setTextSize(HEADTEXT);  
+  tft.fillRect(10 + (DATAWIDE * 5), 8 + (DATAHIGH * 0), 12 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 5), 8 + (DATAHIGH * 0));
+  tft.print("N/A");
+}
+
 // **** Fxn responsible for writing headers (e.g. "Pressure:" and "Thermocouples:") to the display ****
-void writeHeaderText(String locFileName) {
+void writeHeaderText() {
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
 
   tft.setCursor(10, 8 + (8 * HEADTEXT * 0));
-  tft.print("Open:");
-  tft.setTextColor(RED);
-  tft.print(locFileName);
-  tft.setTextColor(BLACK);
+  tft.print("File:");
 
   tft.setCursor(10, 8 + (8 * HEADTEXT * 2)); // **** NOTE: a line's size is given by textsize*8 (per Adafruit_GFX library) ****
   tft.print("Pressure:");                    // **** >> use of HEADTEXT to determine where to draw text based on text size ****
 
-  //tft.setCursor
-
+  /*
   tft.setCursor(10, 8 + (8 * HEADTEXT * 4));
   tft.print("Lat:");
   tft.setCursor(10, 8 + (8 * HEADTEXT * 5));
   tft.print("Lon:");
   tft.setCursor(10, 8 + (8 * HEADTEXT * 6));
   tft.print("Spd:");
+  //*/
 
+  //*
+  tft.setCursor(10, 8 + (8 * HEADTEXT * 4));
+  tft.print("Status: ");
+  //*/
 
   tft.setCursor(10, 8 + (8 * HEADTEXT * 8));
   tft.print("Thermocouples:");
 
   for (int j = 0; j < NUMTHERMOS; j++) {
     tft.setCursor(10, 8 + (8 * HEADTEXT * (9 + j)));
-    tft.print(j + 1); tft.print(":       'F");
+    tft.print(j + 1); //tft.print(":       'F");
   }
 }
 
@@ -991,10 +1114,17 @@ void DAQ_Buffer::write_buffer(String locFileName)
 //fill buffer with GPS data and temperature & pressure readings
 void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4, float pressure)
 {
-  daq_buff[count].hour = ((GPS.hour + 24 + TIMEZONE) % 24); //LOCAL TIME MODIFICATION
+  timeAdjuster myTime(&GPS);
+  daq_buff[count].year = myTime.getYear();
+  daq_buff[count].month = myTime.getMonth();
+  daq_buff[count].day = myTime.getDay();
+  daq_buff[count].hour = myTime.getHour();
   daq_buff[count].minute = GPS.minute;
   daq_buff[count].seconds = GPS.seconds;
   daq_buff[count].milliseconds = GPS.milliseconds;
+
+  /*
+  daq_buff[count].hour = ((GPS.hour + 24 + TIMEZONE) % 24); //LOCAL TIME MODIFICATION
   if ((GPS.hour + TIMEZONE) < 0) {          // negative time-zones: not yet UTC day
     if (GPS.day <= 1) {                       // not yet UTC month
       if (GPS.month <= 1) {                     // not yet UTC year
@@ -1033,6 +1163,7 @@ void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4,
     daq_buff[count].day = GPS.day;
   }
   daq_buff[count].hour += determineDST(daq_buff[count].day, daq_buff[count].month, daq_buff[count].year); //maybe use UTC to determine, then move up to hour calculation
+  //*/
 
   daq_buff[count].lat = GPS.latitudeDegrees;
   daq_buff[count].lon = GPS.longitudeDegrees;
@@ -1055,6 +1186,8 @@ boolean DAQ_Buffer::isFull(void)
    else
       return true;
 }
+
+
 
 runningAVG::runningAVG() {
   buffersize = DEFAULT_RUNAVG_BUFFSIZE;
@@ -1083,12 +1216,12 @@ runningAVG::~runningAVG() {
   
 }
 
-float runningAVG::insertval(float new_val) {
+void runningAVG::insertval(float new_val) {
   *current = new_val;
   //Serial.print("\nInserted "); Serial.print(*current); Serial.print(" into ");
   current = (((current - avgbuffer) + 1) % buffersize) + avgbuffer;
   //return getAVG();
-  return 0.0;
+  return;
 }
 
 float runningAVG::getAVG() {
@@ -1104,5 +1237,120 @@ float runningAVG::getAVG() {
   Serial.print("\nReturned average is ");
   //*/
   return avg;
+}
+
+
+
+timeAdjuster::timeAdjuster() {
+  timezone = TIMEZONE;
+  isfresh = 0x00;
+}
+
+timeAdjuster::timeAdjuster(Adafruit_GPS* p_GPS) {
+  timezone = TIMEZONE;
+  isfresh = 0x00;
+  refresh(p_GPS);
+}
+
+timeAdjuster::timeAdjuster(const timeAdjuster& that) {
+  *this = that;
+}
+
+timeAdjuster::~timeAdjuster() {
+  
+}
+
+uint8_t timeAdjuster::refresh(Adafruit_GPS* p_GPS) {
+  hour = (((*p_GPS).hour + 24 + TIMEZONE) % 24); //LOCAL TIME MODIFICATION
+
+  if (((*p_GPS).hour + TIMEZONE) < 0) {          // negative time-zones: not yet UTC day
+    if ((*p_GPS).day <= 1) {                       // not yet UTC month
+      if ((*p_GPS).month <= 1) {                     // not yet UTC year
+        year = (*p_GPS).year - 1;
+        month = 12;
+        day = 31;
+      } else {
+        year = (*p_GPS).year;
+        month = (*p_GPS).month - 1;
+        day = numDays(month, year);
+      }
+    } else {
+      year = (*p_GPS).year;
+      month = (*p_GPS).month;
+      day = (*p_GPS).day - 1;
+    }
+  } else if (24 <= ((*p_GPS).hour + TIMEZONE)) {       // positive time-zones: jump-start on UTC day
+    if (numDays((*p_GPS).month, (*p_GPS).year) <= (*p_GPS).day) {  // jump-start on UTC month
+      if (12 <= (*p_GPS).month) {                          // jump-start on UTC year
+        year = (*p_GPS).year + 1;
+        month = 1;
+        day = 1;
+      } else {
+        year = (*p_GPS).year;
+        month = (*p_GPS).month + 1;
+        day = 1;
+      }
+    } else {
+      year = (*p_GPS).year;
+      month = (*p_GPS).month;
+      day = (*p_GPS).day + 1;
+    }
+  } else {  // 0 <= ((*p_GPS).hour + TIMEZONE) < 24 ...we're in normal bounds
+    year = (*p_GPS).year;
+    month = (*p_GPS).month;
+    day = (*p_GPS).day;
+  }
+  hour += determineDST(day, month, year); //maybe use UTC to determine, then move up to hour calculation
+
+  isfresh |= 0x0F;
+}
+
+void timeAdjuster::setTimezone(int8_t newtimezone) {
+  timezone = newtimezone;
+}
+
+int8_t timeAdjuster::getHour() {
+  if (isfresh & (0x01 << 0)) {
+    isfresh &= ~(0x01 << 0);
+    return hour;
+  } else {
+    return -1;
+  }
+}
+
+int8_t timeAdjuster::getDay() {
+  if (isfresh & (0x01 << 1)) {
+    isfresh &= ~(0x01 << 1);
+    return day;
+  } else {
+    return -1;
+  }
+}
+
+int8_t timeAdjuster::getMonth() {
+  if (isfresh & (0x01 << 2)) {
+    isfresh &= ~(0x01 << 2);
+    return month;
+  } else {
+    return -1;
+  }
+}
+
+int16_t timeAdjuster::getYear() {
+  if (isfresh & (0x01 << 3)) {
+    isfresh &= ~(0x01 << 3);
+    return year;
+  } else {
+    return -1;
+  }
+}
+
+void timeAdjuster::operator=(const timeAdjuster& that) {
+  this->isfresh  = that.isfresh;
+  this->timezone = that.timezone;
+  this->hour     = that.hour;
+  this->day      = that.day;
+  this->month    = that.month;
+  this->year     = that.year;
 }
 
