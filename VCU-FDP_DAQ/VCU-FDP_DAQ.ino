@@ -133,6 +133,7 @@ typedef struct
     float lat;
     float lon;
     float spd;
+    float acc;
     float angle;
     float alt;
     float temp1;
@@ -161,7 +162,7 @@ class DAQ_Buffer {
   boolean isFull(void);
   void flush_buffer(void);
   void write_buffer(String locFileName);
-  void fill_buffer(float temp1, float temp2, float temp3, float temp4, float pressure);
+  void fill_buffer(float temp1, float temp2, float temp3, float temp4, float pressure, float lastspeed, uint16_t lastmsec);
 
  
 }; 
@@ -246,6 +247,7 @@ String fileName = dtlog + '0' + ext;  //initial name of log file
 File dataFile;
 bool enableHeader = false;
 uint32_t timer = millis();
+float last_GPS_spd = 0;
 
 
 
@@ -395,13 +397,14 @@ void loop() {
     {
       // if buffer is not full continue to fill, else write to microSD card & flush
       if(!daqBuffer.isFull())
-          daqBuffer.fill_buffer(avgdThermocouples[0].getAVG(), avgdThermocouples[1].getAVG(), avgdThermocouples[2].getAVG(), avgdThermocouples[3].getAVG(), avgdPressuretxers[0].getAVG());
+          daqBuffer.fill_buffer(avgdThermocouples[0].getAVG(), avgdThermocouples[1].getAVG(), avgdThermocouples[2].getAVG(), avgdThermocouples[3].getAVG(), avgdPressuretxers[0].getAVG(), last_GPS_spd, last_GPS_msec);
       else
       {
           daqBuffer.write_buffer(fileName);
           daqBuffer.flush_buffer();
-          daqBuffer.fill_buffer(avgdThermocouples[0].getAVG(), avgdThermocouples[1].getAVG(), avgdThermocouples[2].getAVG(), avgdThermocouples[3].getAVG(), avgdPressuretxers[0].getAVG());
+          daqBuffer.fill_buffer(avgdThermocouples[0].getAVG(), avgdThermocouples[1].getAVG(), avgdThermocouples[2].getAVG(), avgdThermocouples[3].getAVG(), avgdPressuretxers[0].getAVG(), last_GPS_spd, last_GPS_msec);
       }
+      last_GPS_spd = GPS.speed;
     }
   }
 
@@ -459,7 +462,8 @@ void loop() {
     isSqueal = false;
   }
 
-  if (cyclecounter < 256) cyclecounter++; else {
+  //if (cyclecounter < 256) cyclecounter++; else {
+  if (GPS.milliseconds < last_GPS_msec) {
     updateThermoDisplay(avgdThermocouples);
     updateStatusDisplay();
     //updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon, GPS.speed);
@@ -527,7 +531,7 @@ void file_create(void)
       //dataFile.println("This is a test");
       //Serial.print("\n This part was not skipped");
       dataFile.print("Hour,Minute,Second,Milliseconds,Day,Month,Year,");
-      dataFile.print("Latitude,Longitude,Speed,Angle,Altitude,");
+      dataFile.print("Latitude,Longitude,Speed,Acceleration,Angle,Altitude,");
       dataFile.print("Thermo1,Thermo2,Thermo3,Thermo4,Pressure,Squeal");
       dataFile.close();
     }
@@ -1112,7 +1116,7 @@ void DAQ_Buffer::write_buffer(String locFileName)
 }
 
 //fill buffer with GPS data and temperature & pressure readings
-void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4, float pressure)
+void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4, float pressure, float lastspeed, uint16_t lastmsec)
 {
   timeAdjuster myTime(&GPS);
   daq_buff[count].year = myTime.getYear();
@@ -1168,6 +1172,7 @@ void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4,
   daq_buff[count].lat = GPS.latitudeDegrees;
   daq_buff[count].lon = GPS.longitudeDegrees;
   daq_buff[count].spd = GPS.speed * 1.151;
+  daq_buff[count].acc = ((GPS.speed - lastspeed) * 1.151) / (((1000 + GPS.milliseconds - lastmsec) % 1000) / 1000); // change in speed (mph) per change in time (~0.2s)
   daq_buff[count].alt = GPS.altitude;
   daq_buff[count].angle = GPS.angle;
   daq_buff[count].temp1 = temp1;
