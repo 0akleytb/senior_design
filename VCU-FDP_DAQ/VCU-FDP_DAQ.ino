@@ -466,10 +466,12 @@ void loop() {
   if (GPS.milliseconds < last_GPS_msec) {
     updateThermoDisplay(avgdThermocouples);
     updateStatusDisplay();
-    //updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon, GPS.speed);
+    //updateGPSDisplay(GPS.latitudeDegrees, GPS.lat, GPS.longitudeDegrees, GPS.lon, GPS.speed, last_GPS_spd, last_GPS_msec);
     updatePressureDisplay(avgdPressuretxers);
     cyclecounter = 0;
   }
+
+ // last_GPS_spd = GPS.speed;
 }
 
 
@@ -671,7 +673,7 @@ void updatePressureDisplay(runningAVG* loc_pressures) {
 }
 
 // **** Fxn responsible for updating display with most recent/relevant GPS data ****
-void updateGPSDisplay(float latitude, char lat, float longitude, char lon, float speed) {
+void updateGPSDisplay(float latitude, char lat, float longitude, char lon, float speed, float lastspeed, uint16_t lastmsec) {
   tft.setTextColor(BLACK);
   tft.setTextSize(HEADTEXT);
   tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 4), 11 * DATAWIDE, DATAHIGH, BACKCOLOR);
@@ -691,6 +693,21 @@ void updateGPSDisplay(float latitude, char lat, float longitude, char lon, float
   if (speed >= 0) tft.print(" ");
     tft.print((speed * 1.151), 1);
     tft.print(" mph");
+  tft.fillRect(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 7), 10 * DATAWIDE, DATAHIGH, BACKCOLOR);
+  tft.setCursor(10 + (DATAWIDE * 4), 8 + (DATAHIGH * 7));
+  /*
+  Serial.print("\nGPS.Speed = "); Serial.println(GPS.speed * 1.151);
+  Serial.print("lastspeed = "); Serial.println(lastspeed * 1.151);
+  Serial.print("delta_spd = "); Serial.println((GPS.speed - lastspeed) * 1.151);
+  Serial.print("  GPS.msec = "); Serial.println(GPS.milliseconds);
+  Serial.print("  lastmsec = "); Serial.println(lastmsec);
+  Serial.print("delta_msec (nocomp) = "); Serial.println((GPS.milliseconds - lastmsec));
+  Serial.print("delta_msec (comped) = "); Serial.println( ((1000 + GPS.milliseconds - lastmsec) % 1000) );
+  Serial.print("\n ratio (nocomp): "); Serial.println( ((GPS.speed - lastspeed) * 1.151) / (GPS.milliseconds - lastmsec) );
+  Serial.print(" ratio (comped): "); Serial.println( ((GPS.speed - lastspeed) * 1.151 * 1000.0) / ((1000 + GPS.milliseconds - lastmsec) % 1000) );
+  //*/
+  tft.print(" ");
+    tft.print(((GPS.speed - lastspeed) * 1.151) / (((1000 + GPS.milliseconds - lastmsec) % 1000) / 1000)); // change in speed (mph) per change in time (~0.2s)
 }
 
 // **** Fxn responsible for reporting system status messages to the display ****
@@ -757,11 +774,12 @@ void updateThermoDisplay(runningAVG* loc_thermos) {
   tft.setTextSize(HEADTEXT);
   for (int j = 0; j < NUMTHERMOS; j++) {
     t = (*(loc_thermos + j)).getAVG();
-    tft.fillRect(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (9 + j)), 7 * DATAWIDE, DATAHIGH, BACKCOLOR);
+    tft.fillRect(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (9 + j)), 9 * DATAWIDE, DATAHIGH, BACKCOLOR);
     tft.setCursor(10 + (DATAWIDE * 2), 8 + (DATAHIGH * (9 + j)));
     
     if (0.0 <= t)
       tft.print(' ');
+    //else, print '-'
 
     if ((-1000.0 < t) && (t < 1000.0)) {
       tft.print(' ');
@@ -772,11 +790,11 @@ void updateThermoDisplay(runningAVG* loc_thermos) {
         }
       }
     }
-    if ((int)(t * 10) == 13802) {
+    if (t >= 1350.0) {
       tft.print("D/C");
     } else {
       tft.print(t, 1);
-      tft.print("'F");
+      tft.print(" F");
     }
   }
 }
@@ -1172,7 +1190,7 @@ void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4,
   daq_buff[count].lat = GPS.latitudeDegrees;
   daq_buff[count].lon = GPS.longitudeDegrees;
   daq_buff[count].spd = GPS.speed * 1.151;
-  daq_buff[count].acc = ((GPS.speed - lastspeed) * 1.151) / (((1000 + GPS.milliseconds - lastmsec) % 1000) / 1000); // change in speed (mph) per change in time (~0.2s)
+  daq_buff[count].acc = ((GPS.speed - lastspeed) * 1.151 * 1000.0) / (((1000 + GPS.milliseconds - lastmsec) % 1000)); // change in speed (mph) per change in time (~0.2s)
   daq_buff[count].alt = GPS.altitude;
   daq_buff[count].angle = GPS.angle;
   daq_buff[count].temp1 = temp1;
