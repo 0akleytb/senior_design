@@ -1,6 +1,6 @@
 /******* 
  *  DAQ Software to Monitor Brake Performance of Vehicle
- *  Author : FDP Senior Design Team
+ *  Author : FDP Senior Design Teams
  *  2017
  *******/
 
@@ -304,7 +304,7 @@ void setup() {
     return;
 
   tft.fillScreen(BACKCOLOR);
-  tft.setRotation(1);
+  tft.setRotation(3);
   writeHeaderText();
   updateFileName();
   drawFrame();
@@ -417,8 +417,8 @@ void loop() {
   // **** Display Branch Loop Code ****
   
   if (MINPRESSURE < p.z && p.z < MAXPRESSURE) {
-    coord = map(p.y, TS_MINY, TS_MAXY, 0, TFTWIDTH);
-    p.y = map(p.x, TS_MAXX, TS_MINX, 0, TFTHEIGHT);
+    coord = map(p.y, TS_MAXY, TS_MINY, 0, TFTWIDTH);
+    p.y = map(p.x, TS_MINX, TS_MAXX, 0, TFTHEIGHT);
     p.x = coord;
     
     if (p.x > (TFTWIDTH - BOXWIDE)) { // **** either button pressed ****
