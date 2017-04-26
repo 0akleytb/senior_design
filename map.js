@@ -2,6 +2,7 @@
 
 /**************MODEL OBJECT STORING APPLICATION DATA*******************/
 var model = {
+    map_loaded: false,
     include_on_hover: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4","Squeal", "Speed", "Latitude", "Longitude", "Second", "Milliseconds"], //items to be shown on marker hover. Same names as in header line
     include_in_dropdown: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4", "Speed"],//items to be shown in dropdown. Same names as in header line
     map: null, //Stores map instance
@@ -69,6 +70,9 @@ function afterReadFile(){
     //Update The Map by adding markers
     newUpdateMap();
 
+    //RemoveOverlay. Recursive call with setTimeout checking every 5000ms to see if loaded flag is true(polling essentially)
+    removeOverlay(5000);
+
 }
 
 
@@ -76,6 +80,10 @@ function afterReadFile(){
  * Reads the file contents into model.data_array and then calls afterReadFile
  */
 function readFile(){
+
+    //Apply overlay and set map_loaded to false
+    document.getElementById("app").classList.add("loading-overlay");
+    model.map_loaded = false;
 
     var UploadFileLocation = document.getElementById("files");
 
@@ -566,6 +574,8 @@ function addMarkerArray(data_array, map){
     map.setCenter({lat: lat, lng: lng});
     map.setZoom(17);
 
+    //A bit of a hack, placed the loaded flag here since google map api function calls seem to be async so hard time queueing the removeOverlay to be after the last api call
+    model.map_loaded = true;
 }
 
 /**
@@ -714,9 +724,25 @@ function addMarkerEventListeners(){
             });
         }
     }
+
 }
 
+/**
+ * Name: removeOverlay
+ * Description: Polls the model.map_loaded flag at specified interval to see and if the flag is true, it removes the overlay
+ * @param time. The polling interval.
+ */
+function removeOverlay(time){
 
+    setTimeout(function(){
+
+        if(model.map_loaded !== true)
+            removeOverlay(time);
+        else
+            document.getElementById("app").classList.remove("loading-overlay");
+
+    }, time)
+}
 
 /*****************************INITIALIZATION FUNCTION AND INVOCATION (START OF APPLICATION)***************************************/
 function init(){ //Create function
