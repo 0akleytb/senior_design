@@ -1,27 +1,19 @@
 //JS
 
-//Good Marker Info: https://developers.google.com/maps/documentation/javascript/markers
-//Info Windows: https://developers.google.com/maps/documentation/javascript/examples/map-latlng-literal
-//Info Window on lat/lng itself: https://developers.google.com/maps/documentation/javascript/infowindows
-//Consider using info windows on lat/lng + kml overlay
-
-
+/**************MODEL OBJECT STORING APPLICATION DATA*******************/
 var model = {
     include_on_hover: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4","Squeal", "Speed", "Latitude", "Longitude", "Second", "Milliseconds"], //items to be shown on marker hover. Same names as in header line
     include_in_dropdown: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4", "Speed"],//items to be shown in dropdown. Same names as in header line
-    map: null,
-    markers: [],
-    squeal_color: "red",
-    no_squeal_color: 'green',
-    data_order: [], //array of strings containing header line info
+    map: null, //Stores map instance
+    markers: [], //Stores each google map data point
+    data_order: [], //array of strings containing header line info. Ex: ["lat","lng","pressure","temperature","squeal"],
     data_selected: null, //Possible values: One of the elements in data order (string)
-    // data_order: ["lat","lng","pressure","temperature","squeal"],
     data_array: [], //Will be filled with each data point, as an object.
-    min_limit: 100,
-    max_limit: 1000,
-    min_color: "white",
-    max_color: "red",
-    gradient_direction: "to right",
+    min_limit: 100, //Default min limit (override when application runs)
+    max_limit: 1000, //Default max limit
+    min_color: "white", //Default min color
+    max_color: "red", //Default max color
+    gradient_direction: "to right", //Horizontal gradient CSS property
     unit_map: { //Using object to map data types to their appropriate units.
         Thermo1: String.fromCharCode(176) + "F",
         Thermo2: String.fromCharCode(176) + "F",
@@ -37,38 +29,33 @@ var model = {
     }
 }
 
+/************UTILITY FUNCTIONS FUNCTIONS THAT DEPEND ON MODEL OBJECT (DATA)*******************/
 
-function init(){ //Create function
-    model.map = new google.maps.Map(document.getElementById('map'), {
-      center: {lat:37.646152, lng:-77.511429},
-      zoom: 17
-    });
+/**
+ * Name:create_object_array
+ * Description: Creates an array of objects from the data read in from file
+ * @param data_order. An array containing the data types in the order which they appear (Ex. Temp,Lat,Lng,Pressure)
+ * @param data. A 2D array containing the data from the log file. Each line represents a data point
+ * @returns {Array}. An 1D array of objects each respresenting a data point.
+ */
+function create_object_array(data_order, data){
+    var object_array = [];
 
-
-    //Add event listeners
-    document.getElementById("files").addEventListener("change", readFilePopulateDropdown)       //listener for fileuploadlocation. Changing file would
-    document.getElementById("dropdown").addEventListener("change", setDataSelected)       //listener for fileuploadlocation. Changing file would
-    document.getElementById("min_color").addEventListener("change", setMinColor)
-    document.getElementById("max_color").addEventListener("change", setMaxColor)
-    document.getElementById("min_limit").addEventListener("change", setMinLimit)
-    document.getElementById("max_limit").addEventListener("change", setMaxLimit)
-    document.getElementById("generate_graph_button").addEventListener("click", showGraph)
-
-    // Check for the various File API support.
-    if (window.File && window.FileReader && window.FileList && window.Blob) {
-        // Great success! All the File APIs are supported.
-        console.log("File API supported");
-    }
-    else {
-        alert('The File APIs are not fully supported in this browser.');
+    for (var i = 0; i < data.length; i++) {//data.length is number of rows (data points)//data is a 2D array
+        object_array.push({});
+        for (var j = 0; j < data_order.length; j++) {//order.length is number of member properties.
+            // object_array[i][order[j]] = next item in file //Use dynamic member accessor to create a property with correct key name
+            object_array[i][data_order[j]] = data[i][j];
+        }
     }
 
-    //Show Default gradient values
-    document.getElementById("min_color").value = model.min_color;
-    document.getElementById("max_color").value = model.max_color;
-
+    return object_array;
 }
 
+/**
+ * Called within ReadFile
+ * Does preliminary work after the file is read, like filling in the data, populating the select dropdown, creating the data table that shows the marker information, and calls updateMap
+ */
 function afterReadFile(){
     //Fill object array
     model.object_data_array = fillObjectDataArray();
@@ -84,25 +71,15 @@ function afterReadFile(){
 
 }
 
-function showGraph(){
-    $("graph_modal").modal('show');
-}
 
-function newUpdateMap(){
-    if(model.markers.length !== 0) {//If markers on map clear
-        clearMarkers(model.markers);
-        model.markers = []; //better way to clear is: model.markers.length = 0;
-    }
-
-    addMarkerArray(model.data_array,model.map);
-}
-
-
-function readFilePopulateDropdown(callback){
+/**
+ * Reads the file contents into model.data_array and then calls afterReadFile
+ */
+function readFile(){
 
     var UploadFileLocation = document.getElementById("files");
 
-    //TO DO: Check over here if correct type of file before instaintate file reader. If not, output error and return
+    //TODO: Check over here if correct type of file before instantiate file reader. If not, output error and return
 
     var reader = new FileReader();
 
@@ -129,7 +106,7 @@ function readFilePopulateDropdown(callback){
 
             for(var j = 0, num_cols = cells.length; j < num_cols; j++){
                 //if (typeof cells[j] != 'undefined')
-                    arr[i-1].push(cells[j]);//Changed to i-1
+                arr[i-1].push(cells[j]);//Changed to i-1
             }
         }
         //At this point arr is a 2D array containing data passed in. Each row is a line. Each coloum in a data point.
@@ -142,191 +119,15 @@ function readFilePopulateDropdown(callback){
 
     }
 
+    //Call HTML5 fileReader to read data as a string. When it finishes, the reader.onload function defined above will be called
     reader.readAsText(UploadFileLocation.files[0]);
 }
 
-
-function ObjToString(object){
-
-    var string = "", value, unit;
-
-    for(var key in object) {
-        if(object.hasOwnProperty(key) && model.include_on_hover.includes(key)) {//If key should be shown on hover
-            value = object[key];
-            unit = model.unit_map[key] ? model.unit_map[key] : ""; //Find the unit via the object map. If doesn't exist empty string as unit
-            string = string + "[" + key + "]" + ": " + value + unit + " ";
-        }
-    }
-
-    return string;
-}
-
-function addMarker(data, map) {
-    if(data.Squeal.trim() === "1") //Everything read as text (stored as strings)
-        addSqueal(data,map);
-    else
-        addCircle(data,map);
-}
-
-function addCircle(data, map){
-    var lat = Number(data.Latitude);
-    var lng = Number(data.Longitude);
-
-    var info = ObjToString(data); //Data serialized as a string
-
-
-    //Add circle to the map passed in
-    var circle = new google.maps.Circle({
-        strokePosition: google.maps.StrokePosition.INSIDE,
-        strokeOpacity: 0,
-        strokeWeight: 2,
-        fillOpacity: 0.95,
-        map: map,
-        center: {lat: lat, lng: lng},
-        radius: 5
-    });
-
-    circle.type = "CIRCLE";
-    circle.data = data; //Could use the data property later.
-    circle.info = info; //Could use the info property later.
-
-    //Store circle in marker array
-    model.markers.push(circle);
-}
-
-function addSqueal(data, map){
-    var lat = Number(data.Latitude);
-    var lng = Number(data.Longitude);
-
-    var info = ObjToString(data); //Data serialized as a string
-
-
-    //Add squeal to the map passed in
-    var marker = new google.maps.Marker({
-        position: {lat: lat, lng: lng},
-        map: map,
-        title: "Squeal Heard!",
-        icon: "https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png"
-        // icon: {size: new google.maps.Size(100,100,"px","px"),
-        //         url:'https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png' }
-    });
-
-    marker.type = "SQUEAL";
-    marker.data = data; //Could use the data property later.
-    marker.info = info; //Could use the info property later.
-
-    //Store squeal in marker array
-    model.markers.push(marker);
-}
-
-// function addMarker(data, map) {
-//     //TO DO: Build Up position object. location: {lat: -34.397, lng: 150.544}. OR Use new lan,lat function in google maps (YES!)
-//     // var location = data.location;
-//     var lat = Number(data.Latitude);
-//     var lng = Number(data.Longitude);
-//     var squeal = data.squeal;
-//     // var squeal = data.squeal.trim(); //Trim string to remove any special characters like newlines or carriage returns
-//     var color;
-//     var temp_percent;
-//     var percent;
-//     var difference;
-//     var info = ObjToString(data);
-//
-//     var min_limit = model.min_limit;
-//     var min_color = model.min_color;
-//     var max_limit = model.max_limit;
-//     var max_color = model.max_color;
-//
-//     //Not doing squeal color anymore. Now only heatmap colors. Squeals are flags.
-//     // if (squeal === "true"){
-//     //     color = model.squeal_color;
-//     // }
-//     // else{
-//     //     color = model.no_squeal_color;
-//     // }
-//
-//     // //Static data gradient display
-//     // difference = Math.max(temperature - min_limit, 0); //Choose max of the two to make sure not negative
-//     // temp_percent = difference*1.0/(max_limit - min_limit); //Float division since 1.0 //Temp_percent could be greater than 1
-//     // percent = Math.min(temp_percent, 1);
-//     //
-//     // color = getGradientColor(min_color, max_color, percent);
-//
-//     /**Future implementation of updating color based on min max colors
-//      *
-//      *     difference = Math.max(data[model.selected_data] - model.min_limit, 0); //Make sure float
-//      *     percent = difference/(model.max_limit-model.min_limit); //Make sure float division
-//      */
-//
-//     //USING CIRCLES
-//     var circle = new google.maps.Circle({
-//         strokePosition: google.maps.StrokePosition.INSIDE,
-//         // strokeColor: '#FF0000',
-//         strokeOpacity: 0,
-//         strokeWeight: 2,
-//         fillColor: color,
-//         fillOpacity: 0.95,
-//         map: map,
-//         center: {lat: lat, lng: lng},
-//         radius: 5
-//         // radius: Math.sqrt(citymap[city].population) * 100
-//     });
-//
-//     circle.data = data; //Could use the data property later.
-//     circle.info = info; //Could use the data property later.
-//
-//     //Store circles in marker array
-//     model.markers.push(circle);
-//
-// }
-
-function addMarkerArray(data_array, map){
-    for (var i = 0, len = data_array.length; i < len; i++) {
-        addMarker(data_array[i], map);
-    }
-
-    //Extract lat and lng of first point and convert to numbers (data file is read in as a string.)
-    var lat = Number(data_array[0].Latitude);
-    var lng = Number(data_array[0].Longitude);
-
-    //Set gradient
-    updateMarkersGradient(model.markers);
-
-    //Set listeners
-    // addMarkerEventListeners(model.markers);
-    addMarkerEventListeners();
-
-    //Set map view to the first marker
-    map.setCenter({lat: lat, lng: lng});
-    map.setZoom(17);
-
-}
-
-function clearMarkers(markers) {
-    setMapOnAll(markers, null);
-}
-
-function setMapOnAll(markers,map) {
-    for (var i = 0; i < markers.length; i++) {
-        markers[i].setMap(map);
-    }
-}
-
-function create_object_array(data_order, data){
-    var object_array = [];
-
-    for (var i = 0; i < data.length; i++) {//data.length is number of rows (data points)//data is a 2D array
-        object_array.push({});
-        for (var j = 0; j < data_order.length; j++) {//order.length is number of member properties.
-            // object_array[i][order[j]] = next item in file //Use dynamic member accessor to create a property with correct key name
-            object_array[i][data_order[j]] = data[i][j];
-        }
-    }
-
-    return object_array;
-}
-
-
+/**
+ *Name: setMinColor
+ *Sets left end of the color gradient
+ * @param e. Event object passed in by onchange eventlistener
+ */
 function setMinColor(e){
     model.min_color = e.target.value;
     var gradient = document.getElementById("color-bar");
@@ -334,8 +135,11 @@ function setMinColor(e){
     updateMarkersGradient(model.markers);
 }
 
-
-
+/**
+ *Name: setMaxColor
+ *Sets right end of the color gradient
+ * @param e. Event object passed in by onchange eventlistener
+ */
 function setMaxColor(e){
     model.max_color = e.target.value;
     var gradient = document.getElementById("color-bar");
@@ -343,32 +147,50 @@ function setMaxColor(e){
     updateMarkersGradient(model.markers);
 }
 
+/**
+ *Name: setMinLimit
+ *Sets min limit of the selected data
+ * @param e. Event object passed in by onchange eventlistener
+ */
 function setMinLimit(e){
     model.min_limit = e.target.value;
     console.log(model.min_limit);
     updateMarkersGradient(model.markers);
 }
 
+/**
+ *Name: setMaxLimit
+ *Sets max limit of the selected data
+ * @param e. Event object passed in by onchange eventlistener
+ */
 function setMaxLimit(e){
     model.max_limit = e.target.value;
     console.log(model.max_limit);
     updateMarkersGradient(model.markers);
 }
 
+/**
+ * Name: setDataSelected
+ * Description: Called when user selects a parameter from the dropdown. Minimum and maximum of that parameter are found
+ * and displayed as min and max limits. Then the gradient and units are updated
+ * @param e
+ */
 function setDataSelected(e){
-    var data = model.data_array;
-    var order = model.data_order;
+
     var object_array = model.object_data_array;
     var min_limit = model.min_limit;
     var max_limit = model.max_limit;
     var elements;
 
+    //Update data_selected as the dropdown
     model.data_selected = e.target.value;
     console.log(model.data_selected);
 
+    //Find min and max of the parameter selected and store into the model store
     model.min_limit = Math.min.apply(null, object_array[model.data_selected]);
     model.max_limit = Math.max.apply(null, object_array[model.data_selected]);
 
+    //Display min and max limits in the inputs
     document.getElementById("min_limit").value = model.min_limit;
     document.getElementById("max_limit").value = model.max_limit;
 
@@ -382,12 +204,14 @@ function setDataSelected(e){
             elements[i].innerHTML = model.unit_map[model.data_selected];
         }
         else {
+            //If not defined in the model.unit_map simply show a star
             elements[i].innerHTML = "*";
         }
     }
 }
 
 /**
+ * Name: getGradientColor
  * Description: Returns an interpolation of a linear gradient as a hex value
  * http://stackoverflow.com/questions/3080421/javascript-color-gradient?noredirect=1&lq=1
  * @param start_color in hex
@@ -439,9 +263,16 @@ function getGradientColor(start_color, end_color, percent) {
 
     return '#' + diff_red + diff_green + diff_blue;
 }
+/**
+ * Name: addOption
+ * http://www.plus2net.com/javascript_tutorial/list-adding.php
+ * Description: Adds an option to a HTML selectbox
+ * @param selectbox. HTML select element to be appended to
+ * @param text. Text of the new option
+ * @param value. Value of the new option
+ * @param index. Index where the option should be inserted (starts from 0)
+ */
 
-
-//http://www.plus2net.com/javascript_tutorial/list-adding.php
 function addOption(selectbox,text,value,index) {
     console.log("created option");
     var optn = document.createElement("OPTION");
@@ -454,56 +285,51 @@ function addOption(selectbox,text,value,index) {
 }
 
 /**
- *
+ * Name: populateDropdown
+ * Description: Called within afterReadFile. Populates the select dropdown with information that is model.include_in_dropdown
  * @param info. Array containing data to be used to populate the dropdown
  * @param id. String ID of the element (a select tag) to be populated.
  */
 function populateDropdown(info, id){
+    //Element will the select tag. The id will be the id of the select tag
     var element = document.getElementById(id);
     // element.options = [];
     element.options.length = 0; // clear options
+
+    //Populate the select tag
     for(var i = 0, len = info.length; i < len; i++){
-        //If header, since data order will be passed as info, is in include in dropdown array show it.
+        //If header, since model_data_order will be passed as info, is in model_include_in_dropdown array show it.
         if (model.include_in_dropdown.includes(info[i])) { //info[i] != "squeal" didnt create random blank options. But this does.
             addOption(element, info[i], info[i], i);
         }
     }
 
-    //Remove all blank options that get randomlny created for some reason. //Could also create a select element and add only filtered options and then replace the select tag
+    //Remove all blank options that get randomly created for some reason. //Could also create a select element and add only filtered options and then replace the select tag
     for(var i = 0; i < element.options.length; i++){
         removeOptionsByValue(element, "");
     }
 
-    //Manually fire an onchange event to updata data selected. Doesnt update by itself when adding an option
+    //Manually fire an onchange event to update data selected. Doesn't update by itself when adding an option
     var event = new Event('change');
     element.dispatchEvent(event);
 }
 
+/**
+ * Name: createDataTable
+ * Description: Called within afterReadFile. Creates a table with the header information.
+ */
 function createDataTable(){
 
-    //If the example table has already been removed, do not create a new one. Exit
+    //If the example table has already been removed, do not create a new one. Exit. //Consider always swapping table when read file in case the file has less or more headers
     if(!document.getElementById("example_table")){
         return;
     }
-    // // var table = document.getElementById("data_table");
-    // //var table = document.createElement("table");
-    //
-    //
-    // var header_row = table.rows[0]; //First row
-    //
-    // //Fill in headers
-    // for (var i = 0, j = 0; i < model.data_order.length; i++) {
-    //     if(model.include_on_hover.includes(model.data_order[i])) {
-    //         header_row.cells[j].innerHTML = model.data_order[i];
-    //         j++;
-    //     }
-    //
-    // }
 
     // Create table.
     var table = document.createElement('table');
+
     //Style table
-    table.className = "table table-bordered data_table"; //bootstrap row aligns it with the rest of the rows
+    table.className = "table table-bordered data_table";
     table.id = "table";
 
     //Create thead and add a table row (tr)
@@ -525,21 +351,22 @@ function createDataTable(){
     }
 
 
-    // var app = document.getElementById('app');
-    // //app.appendChild(table);
-    //
-    // //Replace the first child (fake table) with real table
-    // app.insertBefore(table, app.firstChild);
-    // app.removeChild();
-
     //Get and replace example_table with real table
     var example_table = document.getElementById("example_table");
+
+    //Get parentNode of example_table and call replaceChild on it
     example_table.parentNode.replaceChild(table, example_table);
 }
 
+/**
+ * Name: units
+ * @param name. The data. Ex: pressure, speed.
+ * @returns String. Returns the appropiate unit for the given data. Ex: PSI, MPH
+ */
 function units(name){
-    // return typeof model.unit_map[name] !== undefined ? : model.unit_map[name] : "";
-    //
+    // return typeof model.unit_map[name] !== undefined ? : model.unit_map[name] : ""; //One line version
+
+    // If the unit has been defined in model.unit_map, use it, else empty string
     if (typeof model.unit_map[name] !== "undefined"){
         return model.unit_map[name];
     }
@@ -548,116 +375,39 @@ function units(name){
     }
 }
 
+/**
+ * Name: removeOptionsByValue.
+ * @param select. The HTML select tag whose options will be removed
+ * @param value. The value of the option to be removed
+ * @returns {null}
+ */
 function removeOptionsByValue (select, value) {
+    //Get the select options
     var options = select.options;
+
+    //Loop through all the select tag options and remove the one whose value matches
     for (var i = 0; i < options.length; i++) {
         if (options[i].value === value) {
             select.removeChild(options[i]);
         }
     }
+
     return null
 }
 
-function updateMarkersGradient(data){
-
-    //IF IT IS A SQUEAL DO NOT UPDATE GRADIENT (DOESNT HAVE ONE)
-    // if (data.type === "SQUEAL"){
-    //     console.log
-    //     return
-    // }
-
-    var difference, temp_percent, percent,color;
-    var min_limit = model.min_limit;
-    var max_limit = model.max_limit;
-    var data_selected;
-
-    //Changes HTML5 Colornames to hex values, and leaves them as hex as so
-    var min_color = colorToHex(model.min_color);
-    var max_color = colorToHex(model.max_color);
-
-
-    for(var i = 0, len = data.length; i < len; i++){
-        data_selected = data[i].data[model.data_selected];
-        difference = Math.max(data_selected - min_limit, 0); //Choose max of the two to make sure not negative
-        temp_percent = difference*1.0/(max_limit - min_limit); //Float division since 1.0 //Temp_percent could be greater than 1
-        percent = Math.min(temp_percent, 1);
-
-        color = getGradientColor(min_color, max_color, percent);
-
-        if(data[i].type === "CIRCLE") { //Only update gradient for circle objects
-            //setFillColor as gradientcolor
-            data[i].setOptions({fillColor: color})
-
-            //Add a color property to each marker resembling its gradient color
-            data[i].color = color;
-        }
-        else{
-            //console.log(i,"th point is a squeal");
-        }
-    }
-}
-
-
-function addMarkerEventListeners(){
-    var table = document.getElementById("table");
-    var data_row = table.rows[1];
-
-    for(var i = 0, len = model.markers.length; i < len; i++) {
-        if(model.markers[i].type === "CIRCLE") {//CIRCLES
-            model.markers[i].addListener('mouseover', function () {
-                //document.getElementById("data_location").innerHTML = this.info;
-                //Consider setting zIndex as well.
-
-                for (var j = 0; j < model.include_on_hover.length; j++) {
-                    //Populate data table and add units
-                    data_row.cells[j].innerHTML = this.data[model.include_on_hover[j]] + units(model.include_on_hover[j]);
-                }
-
-                this.setOptions({strokeOpacity: 1, strokeColor: "#000", strokeWeight: 5});
-            });
-
-            model.markers[i].addListener('mouseout', function () {
-                //document.getElementById("data_location").innerHTML = "Data Shown Here On Hover";
-
-                for (var j = 0; j < model.include_on_hover.length; j++) {
-                    //Populate data table and add units
-                    data_row.cells[j].innerHTML = "-";
-                }
-
-                this.setOptions({strokeOpacity: 0});
-            });
-        }
-        else {//Flag.
-            model.markers[i].addListener('mouseover', function () {
-                //document.getElementById("data_location").innerHTML = this.info;
-                //Consider setting zIndex as well.
-                //this.setOptions({strokeOpacity: 1, strokeColor: "#000", strokeWeight: 5});
-
-                for (var j = 0; j < model.include_on_hover.length; j++) {
-                    //Populate data table and add units
-                    data_row.cells[j].innerHTML = this.data[model.include_on_hover[j]] + units(model.include_on_hover[j]);
-                }
-
-            });
-
-            model.markers[i].addListener('mouseout', function () {
-                //document.getElementById("data_location").innerHTML = "Data Shown Here On Hover";
-                //this.setOptions({strokeOpacity: 0});
-            });
-        }
-    }
-}
-
-
-
+/**
+ * Name: fillObjectDataArray
+ * Description: Creates an objects whose keys are the headers in the header line of the read in file, and values are arrays of that data type across all data points
+ * @returns {}. An object
+ */
 function fillObjectDataArray(){
     var object = {};
 
     var data = model.data_array;
     var order = model.data_order;
     var temp;
-    // var object_array = model.object_data_array; // Object containing arrays
 
+    //Create keys for each header in the header line of the read file. (Ex. Pressure, Temperature)
     for(var k = 0, len = order.length; k < len; k++){
         object[order[k]] = [];
     }
@@ -674,10 +424,11 @@ function fillObjectDataArray(){
     return object;
 }
 
-
-
-/**************************HTML COLORNAMES FUNCION ****************/
-//http://stackoverflow.com/questions/1573053/javascript-function-to-convert-color-names-to-hex-codes
+/**
+ * //http://stackoverflow.com/questions/1573053/javascript-function-to-convert-color-names-to-hex-codes
+ * @param color
+ * @returns {CanvasPixelArray}
+ */
 function colorToRGBA(color) {
     // Returns the color as an array of [r, g, b, a] -- all range from 0 - 255
     // color must be a valid canvas fillStyle. This will cover most anything
@@ -713,6 +464,295 @@ function colorToHex(color) {
     return "#"+hex;
 }
 
+/*****************************FUNCTIONS THAT CALL THE GOOGLE MAP API***************************************/
 
-/*****************************PROGRAM LOGIC***************************************/
+/**
+ * Name: addMarker
+ * Description: Adds a data point to the google map
+ * @param data. An object containing all the information for one data point
+ * @param map. The google map instance to add the point too.
+ */
+function addMarker(data, map) {
+    if(data.Squeal.trim() === "1") //Everything read as text (stored as strings)
+        addSqueal(data,map);
+    else
+        addCircle(data,map);
+}
+
+/**
+ * Name: addCircle
+ * Description: Adds a point to the map as a circle
+ * @param data. An object containing all the information for one data point
+ * @param map. The google map instance to add the point too.
+ */
+function addCircle(data, map){
+
+    //Get latitude and longitude properties and convert to a number (read in as a string)
+    var lat = Number(data.Latitude);
+    var lng = Number(data.Longitude);
+
+
+    //Add circle to the map passed in
+    var circle = new google.maps.Circle({
+        strokePosition: google.maps.StrokePosition.INSIDE,
+        strokeOpacity: 0,
+        strokeWeight: 2,
+        fillOpacity: 0.95,
+        map: map,
+        center: {lat: lat, lng: lng},
+        radius: 5
+    });
+
+    //Add properties for later use
+    circle.type = "CIRCLE";
+    circle.data = data; //Could use the data property later.
+
+    //Store circle in marker array
+    model.markers.push(circle);
+}
+
+/**
+ * Name: addSqueal
+ * Description: Adds a point to the map as a flag (squeal)
+ * @param data. An object containing all the information for one data point
+ * @param map. The google map instance to add the point too.
+ */
+function addSqueal(data, map){
+    var lat = Number(data.Latitude);
+    var lng = Number(data.Longitude);
+
+
+    //Add squeal to the map passed in
+    var marker = new google.maps.Marker({
+        position: {lat: lat, lng: lng},
+        map: map,
+        title: "Squeal Heard!",
+        icon: "https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png"
+        // icon: {size: new google.maps.Size(100,100,"px","px"),
+        //         url:'https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png' }
+    });
+
+    //Add properties to be used later
+    marker.type = "SQUEAL";
+    marker.data = data; //Could use the data property later.
+
+    //Store squeal in marker array
+    model.markers.push(marker);
+}
+
+/**
+ * Name: addMarkerArray
+ * Description: Adds an array of objects to the map
+ * @param data_array. An array of objects containing all points to be added to the map
+ * @param map. The google map instance to add the point too.
+ */
+function addMarkerArray(data_array, map){
+    for (var i = 0, len = data_array.length; i < len; i++) {
+        addMarker(data_array[i], map);
+    }
+
+    //Extract lat and lng of first point and convert to numbers (data file is read in as a string.)
+    var lat = Number(data_array[0].Latitude);
+    var lng = Number(data_array[0].Longitude);
+
+    //Set gradient
+    updateMarkersGradient(model.markers);
+
+    //Set listeners
+    // addMarkerEventListeners(model.markers);
+    addMarkerEventListeners();
+
+    //Set map view to the first marker
+    map.setCenter({lat: lat, lng: lng});
+    map.setZoom(17);
+
+}
+
+/**
+ * Name: newUpdateMap
+ * Description: Empties the model.markers array, clears the markers off of the map and adds in the new data.
+ * Called whenever a new file is uploaded.
+ */
+function newUpdateMap(){
+    //Clear markers array and on map
+    if(model.markers.length !== 0) {//If markers on map clear
+        clearMarkers(model.markers);
+        model.markers = []; //better way to clear is: model.markers.length = 0;
+    }
+
+    //Add new markers
+    addMarkerArray(model.data_array,model.map);
+}
+
+/**
+ * Description: Takes the markers array and sets all their map properties to null thereby taking them off the google map instance.
+ * @param markers
+ */
+function clearMarkers(markers) {
+    setMapOnAll(markers, null);
+}
+
+/**
+ * Description: Takes the markers array and puts them on a map. If pass null as map, it removes the markers off their current map
+ * @param markers
+ * @param map
+ */
+function setMapOnAll(markers,map) {
+    for (var i = 0; i < markers.length; i++) {
+        markers[i].setMap(map);
+    }
+}
+
+/**
+ * Name: updateMarkersGradient
+ * Description: Updates the gradient on google map markers or circles
+ * @param data. An array of markers (model.markers_array)
+ */
+function updateMarkersGradient(data){
+
+    //IF IT IS A SQUEAL DO NOT UPDATE GRADIENT (DOESNT HAVE ONE)
+    // if (data.type === "SQUEAL"){
+    //     console.log
+    //     return
+    // }
+
+    var difference, temp_percent, percent,color;
+    var min_limit = model.min_limit;
+    var max_limit = model.max_limit;
+    var data_selected;
+
+    //Changes HTML5 Colornames to hex values, and leaves them as hex as so
+    var min_color = colorToHex(model.min_color);
+    var max_color = colorToHex(model.max_color);
+
+
+    for(var i = 0, len = data.length; i < len; i++){
+        //Select data to base gradient off of
+        data_selected = data[i].data[model.data_selected];
+
+        //Calculate the intensity of the gradient and store it in percent
+        difference = Math.max(data_selected - min_limit, 0); //Choose max of the two to make sure not negative
+        temp_percent = difference*1.0/(max_limit - min_limit); //Float division since 1.0 //Temp_percent could be greater than 1
+        percent = Math.min(temp_percent, 1);
+
+        //Retrieve color based on percentage between min and max colors
+        color = getGradientColor(min_color, max_color, percent);
+
+        //Only update gradient for circle objects
+        if(data[i].type === "CIRCLE") {
+            //setFillColor as gradientcolor
+            data[i].setOptions({fillColor: color})
+
+            //Add a color property to each marker resembling its gradient color
+            data[i].color = color;
+        }
+        else{
+            //console.log(i,"th point is a squeal");
+        }
+    }
+}
+
+/**
+ * Name: addMarkersEventListeners
+ * Description: adds mouseover and mouseout event listeners to each google maps point (flag or circle) so that is shows the information
+ * of that point on hover.
+ */
+function addMarkerEventListeners(){
+    var table = document.getElementById("table");
+    var data_row = table.rows[1];
+
+    //Loop through points and add event listeners depending on if it is a circle or a squeal (flag)
+    for(var i = 0, len = model.markers.length; i < len; i++) {
+        if(model.markers[i].type === "CIRCLE") {//CIRCLES
+            model.markers[i].addListener('mouseover', function () {
+                //Consider setting zIndex as well.
+
+                //Show the information for that data point on hover
+                for (var j = 0; j < model.include_on_hover.length; j++) {
+                    //Populate data table and add units
+                    data_row.cells[j].innerHTML = this.data[model.include_on_hover[j]] + units(model.include_on_hover[j]);
+                }
+
+                //Outline the marker being hovered over
+                this.setOptions({strokeOpacity: 1, strokeColor: "#000", strokeWeight: 5});
+            });
+
+            model.markers[i].addListener('mouseout', function () {
+                //document.getElementById("data_location").innerHTML = "Data Shown Here On Hover";
+
+                //Hide the information on mouseout
+                for (var j = 0; j < model.include_on_hover.length; j++) {
+                    //Populate data table and add units
+                    data_row.cells[j].innerHTML = "-";
+                }
+
+                this.setOptions({strokeOpacity: 0});
+            });
+        }
+        else {//Flag.
+            model.markers[i].addListener('mouseover', function () {
+                //Consider setting zIndex as well.
+                //this.setOptions({strokeOpacity: 1, strokeColor: "#000", strokeWeight: 5});
+
+                //Show the information for that data point on hover
+                for (var j = 0; j < model.include_on_hover.length; j++) {
+                    //Populate data table and add units
+                    data_row.cells[j].innerHTML = this.data[model.include_on_hover[j]] + units(model.include_on_hover[j]);
+                }
+
+            });
+
+            //Hide the information on mouseout
+            model.markers[i].addListener('mouseout', function () {
+                //document.getElementById("data_location").innerHTML = "Data Shown Here On Hover";
+                //this.setOptions({strokeOpacity: 0});
+
+                for (var j = 0; j < model.include_on_hover.length; j++) {
+                    //Populate data table and add units
+                    data_row.cells[j].innerHTML = "-";
+                }
+            });
+        }
+    }
+}
+
+
+
+/*****************************INITIALIZATION FUNCTION AND INVOCATION (START OF APPLICATION)***************************************/
+function init(){ //Create function
+
+    //Creates a new google maps instance and stores it into model.map
+    model.map = new google.maps.Map(document.getElementById('map'), {
+        center: {lat:37.646152, lng:-77.511429},
+        zoom: 17
+    });
+
+    //Add event listeners
+    document.getElementById("files").addEventListener("change", readFile)
+    document.getElementById("dropdown").addEventListener("change", setDataSelected)
+    document.getElementById("min_color").addEventListener("change", setMinColor)
+    document.getElementById("max_color").addEventListener("change", setMaxColor)
+    document.getElementById("min_limit").addEventListener("change", setMinLimit)
+    document.getElementById("max_limit").addEventListener("change", setMaxLimit)
+
+    // Check for the various File API support.
+    if (window.File && window.FileReader && window.FileList && window.Blob) {
+        // Great success! All the File APIs are supported.
+        console.log("File API supported");
+    }
+    else {
+        alert('The File APIs are not fully supported in this browser.');
+    }
+
+    //Show Default gradient values
+    document.getElementById("min_color").value = model.min_color;
+    document.getElementById("max_color").value = model.max_color;
+
+    //Show default min and max values
+    document.getElementById("min_limit").value = model.min_limit;
+    document.getElementById("max_limit").value = model.max_limit;
+
+}
+
+/*********Start Program***********/
 init();
