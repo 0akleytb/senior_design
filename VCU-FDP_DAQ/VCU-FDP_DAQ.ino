@@ -790,7 +790,7 @@ void updateThermoDisplay(runningAVG* loc_thermos) {
         }
       }
     }
-    if (t >= 1350.0) {
+    if (t >= 1300.0) {
       tft.print("D/C");
     } else {
       tft.print(t, 1);
