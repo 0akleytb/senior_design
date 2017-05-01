@@ -4,7 +4,7 @@
 var model = {
     map_loaded: false,
     include_on_hover: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4","Squeal", "Speed", "Latitude", "Longitude", "Second", "Milliseconds"], //items to be shown on marker hover. Same names as in header line
-    include_in_dropdown: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4", "Speed"],//items to be shown in dropdown. Same names as in header line
+    include_in_dropdown: ["Pressure","Thermo1","Thermo2","Thermo3", "Thermo4","Speed"],//items to be shown in dropdown. Same names as in header line
     map: null, //Stores map instance
     markers: [], //Stores each google map data point
     data_order: [], //array of strings containing header line info. Ex: ["lat","lng","pressure","temperature","squeal"],
@@ -23,7 +23,8 @@ var model = {
         Pressure: "PSI",
         Latitude: String.fromCharCode(176),
         Longitude: String.fromCharCode(176),
-        Speed: "MPH"
+        Speed: "MPH",
+        Acceleration: "MPH/s"
     },
     object_data_array: {//Each key will be a data type (temperature,pressure,etc). Each value will be an array containing the all of those values across all of the points
 

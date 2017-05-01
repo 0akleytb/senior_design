@@ -137,3 +137,7 @@ form input{
     left: 0;
     background: rgba(0, 0, 0, 0.9);
 }
+
+.no-right-padding{
+    padding-right: 0px!important;
+}
