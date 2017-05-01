@@ -396,15 +396,15 @@ void loop() {
     else
     {
       // if buffer is not full continue to fill, else write to microSD card & flush
-      if(!daqBuffer.isFull())
-          daqBuffer.fill_buffer(avgdThermocouples[0].getAVG(), avgdThermocouples[1].getAVG(), avgdThermocouples[2].getAVG(), avgdThermocouples[3].getAVG(), avgdPressuretxers[0].getAVG(), last_GPS_spd, last_GPS_msec);
-      else
+      if(daqBuffer.isFull())
       {
           daqBuffer.write_buffer(fileName);
           daqBuffer.flush_buffer();
-          daqBuffer.fill_buffer(avgdThermocouples[0].getAVG(), avgdThermocouples[1].getAVG(), avgdThermocouples[2].getAVG(), avgdThermocouples[3].getAVG(), avgdPressuretxers[0].getAVG(), last_GPS_spd, last_GPS_msec);
       }
+      daqBuffer.fill_buffer(avgdThermocouples[0].getAVG(), avgdThermocouples[1].getAVG(), avgdThermocouples[2].getAVG(), avgdThermocouples[3].getAVG(), avgdPressuretxers[0].getAVG(), last_GPS_spd, last_GPS_msec);
+      //Serial.print("B4 last_spd: "); Serial.println(last_GPS_spd);
       last_GPS_spd = GPS.speed;
+      //Serial.print("Af last_spd: "); Serial.println(last_GPS_spd);
     }
   }
 
@@ -470,8 +470,7 @@ void loop() {
     updatePressureDisplay(avgdPressuretxers);
     cyclecounter = 0;
   }
-
- // last_GPS_spd = GPS.speed;
+  
 }
 
 
@@ -490,7 +489,7 @@ void dateTime(uint16_t* dtdate, uint16_t* dttime) {
 
  // return date using FAT_DATE macro to format fields
  //*date = FAT_DATE(now.year(), now.month(), now.day());
- *dtdate = FAT_DATE(myTime.getYear(), myTime.getMonth(), myTime.getDay());
+ *dtdate = FAT_DATE((myTime.getYear() + 2000), myTime.getMonth(), myTime.getDay());
 
  // return time using FAT_TIME macro to format fields
  //*time = FAT_TIME(now.hour(), now.minute(), now.second());
@@ -514,10 +513,11 @@ void file_create(void)
         return;
       }
       fileName = dtlog + filecounter + ext;
-      
+
+      /*
       Serial.print("\nfilecounter = "); Serial.print(filecounter);
       Serial.print("\nfileName = "); Serial.println(fileName);
-      
+      */
     }
 
     dataFile = SD.open(fileName, FILE_WRITE);
@@ -525,7 +525,10 @@ void file_create(void)
     if(dataFile){
       Serial.print(fileName); Serial.println(" opened successfully");}
     else{
-      Serial.println("error opening datalog.csv");}
+      Serial.print("error opening ");
+      Serial.print(fileName);
+      Serial.println(".csv");
+     }
     
     /*if the file is available, write to it: */
     if (dataFile) 
@@ -707,7 +710,7 @@ void updateGPSDisplay(float latitude, char lat, float longitude, char lon, float
   Serial.print(" ratio (comped): "); Serial.println( ((GPS.speed - lastspeed) * 1.151 * 1000.0) / ((1000 + GPS.milliseconds - lastmsec) % 1000) );
   //*/
   tft.print(" ");
-    tft.print(((GPS.speed - lastspeed) * 1.151) / (((1000 + GPS.milliseconds - lastmsec) % 1000) / 1000)); // change in speed (mph) per change in time (~0.2s)
+    tft.print(((GPS.speed - lastspeed) * 1.151 * 1000.0) / ((1000 + GPS.milliseconds - lastmsec) % 1000)); // change in speed (mph) per change in time (~0.2s)
 }
 
 // **** Fxn responsible for reporting system status messages to the display ****
@@ -797,18 +800,6 @@ void updateThermoDisplay(runningAVG* loc_thermos) {
       tft.print(" F");
     }
   }
-}
-
-// **** Fxn responsible for updating display with most recent/relevant Pressure, Temperature, and GPS data ****
-void updateDisplay() {
-
-  tft.setTextColor(BLACK);
-  tft.setTextSize(HEADTEXT);
-
-  //updatePressureDisplay();
-  //updateGPSDisplay(0, 'c', 0, 'c', 0);
-  //updateThermoDisplay();
-
 }
 
 // **** Fxns responsible for updating display with current file being written ****
@@ -1120,6 +1111,7 @@ void DAQ_Buffer::write_buffer(String locFileName)
       dataFile.print(daq_buff[i].lat, 5);        dataFile.print(",");
       dataFile.print(daq_buff[i].lon, 5);        dataFile.print(",");
       dataFile.print(daq_buff[i].spd);           dataFile.print(",");
+      dataFile.print(daq_buff[i].acc);           dataFile.print(",");
       dataFile.print(daq_buff[i].alt);           dataFile.print(",");
       dataFile.print(daq_buff[i].angle);         dataFile.print(",");
       dataFile.print(daq_buff[i].temp1);         dataFile.print(",");
@@ -1190,7 +1182,7 @@ void DAQ_Buffer::fill_buffer(float temp1, float temp2, float temp3, float temp4,
   daq_buff[count].lat = GPS.latitudeDegrees;
   daq_buff[count].lon = GPS.longitudeDegrees;
   daq_buff[count].spd = GPS.speed * 1.151;
-  daq_buff[count].acc = ((GPS.speed - lastspeed) * 1.151 * 1000.0) / (((1000 + GPS.milliseconds - lastmsec) % 1000)); // change in speed (mph) per change in time (~0.2s)
+  daq_buff[count].acc = (((GPS.speed - lastspeed) * 1.151 * 1000.0) / ((1000 + GPS.milliseconds - lastmsec) % 1000)); // change in speed (mph) per change in time (~0.2s)
   daq_buff[count].alt = GPS.altitude;
   daq_buff[count].angle = GPS.angle;
   daq_buff[count].temp1 = temp1;
@@ -1284,9 +1276,9 @@ timeAdjuster::~timeAdjuster() {
 }
 
 uint8_t timeAdjuster::refresh(Adafruit_GPS* p_GPS) {
-  hour = (((*p_GPS).hour + 24 + TIMEZONE) % 24); //LOCAL TIME MODIFICATION
+  hour = (((*p_GPS).hour + 24 + timezone) % 24); //LOCAL TIME MODIFICATION
 
-  if (((*p_GPS).hour + TIMEZONE) < 0) {          // negative time-zones: not yet UTC day
+  if (((*p_GPS).hour + timezone) < 0) {          // negative time-zones: not yet UTC day
     if ((*p_GPS).day <= 1) {                       // not yet UTC month
       if ((*p_GPS).month <= 1) {                     // not yet UTC year
         year = (*p_GPS).year - 1;
@@ -1302,7 +1294,7 @@ uint8_t timeAdjuster::refresh(Adafruit_GPS* p_GPS) {
       month = (*p_GPS).month;
       day = (*p_GPS).day - 1;
     }
-  } else if (24 <= ((*p_GPS).hour + TIMEZONE)) {       // positive time-zones: jump-start on UTC day
+  } else if (24 <= ((*p_GPS).hour + timezone)) {       // positive time-zones: jump-start on UTC day
     if (numDays((*p_GPS).month, (*p_GPS).year) <= (*p_GPS).day) {  // jump-start on UTC month
       if (12 <= (*p_GPS).month) {                          // jump-start on UTC year
         year = (*p_GPS).year + 1;
@@ -1318,7 +1310,7 @@ uint8_t timeAdjuster::refresh(Adafruit_GPS* p_GPS) {
       month = (*p_GPS).month;
       day = (*p_GPS).day + 1;
     }
-  } else {  // 0 <= ((*p_GPS).hour + TIMEZONE) < 24 ...we're in normal bounds
+  } else {  // 0 <= ((*p_GPS).hour + timezone) < 24 ...we're in normal bounds
     year = (*p_GPS).year;
     month = (*p_GPS).month;
     day = (*p_GPS).day;
@@ -1333,39 +1325,27 @@ void timeAdjuster::setTimezone(int8_t newtimezone) {
 }
 
 int8_t timeAdjuster::getHour() {
-  if (isfresh & (0x01 << 0)) {
+  if (isfresh & (0x01 << 0))
     isfresh &= ~(0x01 << 0);
-    return hour;
-  } else {
-    return -1;
-  }
+  return hour;
 }
 
 int8_t timeAdjuster::getDay() {
-  if (isfresh & (0x01 << 1)) {
+  if (isfresh & (0x01 << 1))
     isfresh &= ~(0x01 << 1);
-    return day;
-  } else {
-    return -1;
-  }
+  return day;
 }
 
 int8_t timeAdjuster::getMonth() {
-  if (isfresh & (0x01 << 2)) {
+  if (isfresh & (0x01 << 2))
     isfresh &= ~(0x01 << 2);
-    return month;
-  } else {
-    return -1;
-  }
+  return month;
 }
 
 int16_t timeAdjuster::getYear() {
-  if (isfresh & (0x01 << 3)) {
+  if (isfresh & (0x01 << 3))
     isfresh &= ~(0x01 << 3);
-    return year;
-  } else {
-    return -1;
-  }
+  return year;
 }
 
 void timeAdjuster::operator=(const timeAdjuster& that) {
