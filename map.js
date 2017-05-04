@@ -3,7 +3,7 @@
 /**************MODEL OBJECT STORING APPLICATION DATA*******************/
 var model = {
     map_loaded: false,
-    include_on_hover: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4","Squeal", "Speed", "Latitude", "Longitude", "Second", "Milliseconds"], //items to be shown on marker hover. Same names as in header line
+    include_on_hover: ["Pressure","Thermo1","Thermo2","Thermo3","Thermo4","Squeal", "Speed", "Acceleration" ,"Latitude", "Longitude", "Second", "Milliseconds"], //items to be shown on marker hover. Same names as in header line
     include_in_dropdown: ["Pressure","Thermo1","Thermo2","Thermo3", "Thermo4","Speed"],//items to be shown in dropdown. Same names as in header line
     map: null, //Stores map instance
     markers: [], //Stores each google map data point
@@ -680,8 +680,9 @@ function addMarkerEventListeners(){
 
                 //Show the information for that data point on hover
                 for (var j = 0; j < model.include_on_hover.length; j++) {
-                    //Populate data table and add units
-                    data_row.cells[j].innerHTML = this.data[model.include_on_hover[j]] + units(model.include_on_hover[j]);
+                    //Populate data table and add units. Check if the include_hover_array item is in the data file
+                    if(model.data_order.includes(model.include_on_hover[j]))
+                        data_row.cells[j].innerHTML = this.data[model.include_on_hover[j]] + units(model.include_on_hover[j]);
                 }
 
                 //Outline the marker being hovered over
@@ -708,7 +709,8 @@ function addMarkerEventListeners(){
                 //Show the information for that data point on hover
                 for (var j = 0; j < model.include_on_hover.length; j++) {
                     //Populate data table and add units
-                    data_row.cells[j].innerHTML = this.data[model.include_on_hover[j]] + units(model.include_on_hover[j]);
+                    if(model.data_order.includes(model.include_on_hover[j]))
+                        data_row.cells[j].innerHTML = this.data[model.include_on_hover[j]] + units(model.include_on_hover[j]);
                 }
 
             });
